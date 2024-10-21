@@ -1,5 +1,6 @@
 from CompiScript.compiscriptLexer import compiscriptLexer
 from CompiScript.compiscriptParser import compiscriptParser
+from Analyzer.analyzer import SymbolTableGenerator
 from antlr4 import FileStream, CommonTokenStream
 from ParseTree.parse_tree import TreeVisualizer
 
@@ -27,6 +28,10 @@ def main():
     tree_visualizer.render(output_file=tree_visualizer.name, 
                            format='png', 
                            output_dir='src/ParseTree/Output')
+    
+    # Create a SymbolTableGenerator object and visit the parse tree
+    symbol_table_generator = SymbolTableGenerator()
+    symbol_table_generator.visit(parse_tree)
 
 
 if __name__ == '__main__':

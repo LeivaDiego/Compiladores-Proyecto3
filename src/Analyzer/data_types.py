@@ -7,6 +7,7 @@ class DataType():
     """
     def __init__(self, name):
         self.data_type = name
+        self.size = 8
 
     def __str__(self):
         return self.data_type
@@ -14,19 +15,23 @@ class DataType():
 class NumberType(DataType):
     def __init__(self):
         super().__init__("num")
+        self.size = 4
 
 class StringType(DataType):
-    def __init__(self):
+    def __init__(self, value):
         super().__init__("str")
+        self.size = len(value)
 
 class BooleanType(DataType):
     def __init__(self):
         super().__init__("bool")
+        self.size = 1
 
 class NilType(DataType):
     def __init__(self):
         super().__init__("nil")
+        self.size = 0
 
-class UndefinedType(DataType):
+class Uninitialized(DataType):
     def __init__(self):
-        super().__init__("undefined")
+        super().__init__("uninitialized")
