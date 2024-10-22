@@ -30,9 +30,9 @@ def main():
                            output_dir='src/ParseTree/Output')
     
     # Create a SymbolTableGenerator object and visit the parse tree
-    symbol_table_generator = SymbolTableGenerator()
-    symbol_table_generator.visit(parse_tree)
-
+    analyzer = SymbolTableGenerator()
+    analyzer.visit(parse_tree)
+    analyzer.scope_manager.visualize_symbol_tables()
 
 if __name__ == '__main__':
     try:

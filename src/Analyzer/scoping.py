@@ -1,5 +1,5 @@
-from objetc_types import ObjectType, VariableType, FunctionType, ClassType
-
+from Analyzer.objetc_types import ObjectType, VariableType, FunctionType, ClassType
+from tabulate import tabulate
 
 class Scope:
     def __init__(self, id, depth, parent_scope=None):
@@ -73,14 +73,21 @@ class Scope:
 
 class ScopeManager():
     def __init__(self):
-        self.current_scope = Scope("global", 0)
+        self.current_scope = None
         self.scope_stack: list[Scope] = []
         self.main_stack: list[Scope] = []
         self.depth = 0
 
-    def enter_scope(self, id):
-        self.depth += 1
-        new_scope = Scope(id, self.depth, self.current_scope)
+    def enter_scope(self, id="global"):
+        # If there is no current scope, create a global scope
+        if self.current_scope is None:
+            new_scope = Scope(id, self.depth)
+        # Otherwise, create a new scope with the current scope as its parent
+        else:
+            self.depth += 1
+            new_scope = Scope(id, self.depth, self.current_scope)
+        
+        # Append the new scope to the scope stack and set it as the current scope
         self.scope_stack.append(new_scope)
         self.main_stack.append(new_scope)
         self.current_scope = new_scope
@@ -102,5 +109,46 @@ class ScopeManager():
     def update_symbol(self, symbol: ObjectType):
         self.current_scope.update_symbol(symbol)
 
-    def __str__(self):
-        return f"Current scope: {self.current_scope}"
+
+    def visualize_symbol_tables(self):
+        variables_table = []
+        functions_table = []
+        classes_table = []
+
+        # Iterate over all scopes in the main scope stack
+        for scope in self.main_stack:
+            # Collect variables
+            for variable in scope.variables:
+                variables_table.append([
+                    variable.id, variable.data_type, variable.initialized, variable.value, variable.size
+                ])
+
+            # Collect functions
+            for function in scope.functions:
+                param_names = [param.id for param in function.parameters]
+                functions_table.append([
+                    function.id, function.return_type, ", ".join(param_names), function.is_anon
+                ])
+
+            # Collect classes
+            for cls in scope.classes:
+                method_names = [method.id for method in cls.methods]
+                attr_names = [attr.id for attr in cls.attributes]
+                classes_table.append([
+                    cls.id, cls.parent, ", ".join(attr_names), ", ".join(method_names)
+                ])
+
+        # Format tables using tabulate
+        variables_table_str = tabulate(variables_table, headers=["ID", "Data Type", "Initialized", "Value", "Size"], tablefmt="grid")
+        functions_table_str = tabulate(functions_table, headers=["ID", "Return Type", "Parameters", "Anonymous"], tablefmt="grid")
+        classes_table_str = tabulate(classes_table, headers=["ID", "Parent", "Attributes", "Methods"], tablefmt="grid")
+
+        # Write to file the tables
+        with open("src/SymbolTables/variable_table.txt", "w") as f:
+            f.write(variables_table_str)
+        
+        with open("src/SymbolTables/functions_table.txt", "w") as f:
+            f.write(functions_table_str)
+
+        with open("src/SymbolTables/classes_table.txt", "w") as f:
+            f.write(classes_table_str)

@@ -31,7 +31,3 @@ class NilType(DataType):
     def __init__(self):
         super().__init__("nil")
         self.size = 0
-
-class Uninitialized(DataType):
-    def __init__(self):
-        super().__init__("uninitialized")

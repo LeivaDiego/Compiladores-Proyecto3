@@ -1,3 +1,5 @@
+from Analyzer.data_types import DataType, NumberType, StringType, BooleanType, NilType
+
 class ObjectType():
     """
     Base class for all object types.
@@ -8,7 +10,7 @@ class ObjectType():
     def __init__(self, name, context):
         self.id = name
         self.context = context
-        self.object_type = self.__class__.__name__.replace('Type', '')
+        self.object_type = self.__class__.__name__.replace("Type", "").lower()
 
     def __str__(self):
         return f"{self.object_type} - {self.id}"
@@ -22,9 +24,11 @@ class VariableType(ObjectType):
         self.value = None
         self.size = None
 
-    def get_value(self):
-        return self.value
+    def set_initialized(self):
+        if self.context.getChildCount() > 3:
+            self.initialized = True
 
+        
 
 class FunctionType(ObjectType):
     def __init__(self, name, context):
