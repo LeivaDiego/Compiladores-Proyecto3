@@ -11,6 +11,8 @@ class ObjectType():
         self.id = name
         self.context = context
         self.object_type = self.__class__.__name__.replace("Type", "").lower()
+        self.scope_index = None
+        self.scope_id = None
 
     def __str__(self):
         return f"{self.object_type} - {self.id}"
@@ -21,13 +23,11 @@ class VariableType(ObjectType):
         super().__init__(name, context)
         self.data_type = None
         self.initialized = False
-        self.value = None
-        self.size = None
+        self.offset = None
+        self.size = 0
 
-    def set_initialized(self):
-        if self.context.getChildCount() > 3:
-            self.initialized = True
-
+    def set_size(self):
+        self.size = self.data_type.size
         
 
 class FunctionType(ObjectType):
@@ -35,7 +35,9 @@ class FunctionType(ObjectType):
         super().__init__(name, context)
         self.return_type = None
         self.parameters: list[VariableType] = []
-        self.is_anon = False
+
+    def add_parameter(self, parameter: VariableType): 
+        self.parameters.append(parameter)
 
 
 class ClassType(ObjectType):
@@ -44,3 +46,11 @@ class ClassType(ObjectType):
         self.parent = None
         self.attributes = list[VariableType] = []
         self.methods = list[FunctionType] = []
+        self.size = 0
+
+    def add_attribute(self, attribute: VariableType):
+        self.attributes.append(attribute)
+        self.size += attribute.data_type.size
+
+    def add_method(self, method: FunctionType):
+        self.methods.append(method)

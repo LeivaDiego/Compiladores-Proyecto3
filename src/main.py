@@ -32,6 +32,7 @@ def main():
     # Create a SymbolTableGenerator object and visit the parse tree
     analyzer = SymbolTableGenerator()
     analyzer.visit(parse_tree)
+    analyzer.scope_manager.finalize_scopes()
     analyzer.scope_manager.visualize_symbol_tables()
 
 if __name__ == '__main__':
