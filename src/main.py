@@ -2,6 +2,8 @@ from CompiScript.compiscriptLexer import compiscriptLexer
 from CompiScript.compiscriptParser import compiscriptParser
 from antlr4 import FileStream, CommonTokenStream
 from ParseTree.parse_tree import TreeVisualizer
+from antlr4.error.ErrorStrategy import DefaultErrorStrategy
+from Utils.custom_exception import ThrowingErrorListener
 
 
 def main():
@@ -11,12 +13,17 @@ def main():
 
     # Create the lexer and use a custom error listener
     lexer = compiscriptLexer(input_stream)
+    lexer.removeErrorListeners()  # Remove the default error listener
+    lexer.addErrorListener(ThrowingErrorListener.INSTANCE)  # Add custom error listener
 
     # Create a token stream from the lexer
     token_stream = CommonTokenStream(lexer)
 
     # Create the parser and use a custom error listener
     parser = compiscriptParser(token_stream)
+    parser._errHandler = DefaultErrorStrategy() # Set Error Strategy to stop parsing on first error
+    parser.removeErrorListeners()   # Remove the default error listener
+    parser.addErrorListener(ThrowingErrorListener.INSTANCE) # Add custom error listener
 
     # Start parsing from the program rule
     parse_tree = parser.program()
