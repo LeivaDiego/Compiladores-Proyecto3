@@ -1,6 +1,7 @@
 from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SymbolTable.symbol import Symbol, Variable, Function, Class, Scope
+from tabulate import tabulate
 from typing import List
 
 class TableGenerator(compiscriptVisitor):
@@ -83,7 +84,23 @@ class TableGenerator(compiscriptVisitor):
             self.current_scope = self.scope_stack[-1] if self.scope_stack else 0
             self.printf(f"INFO -> Exiting: {exited_scope.id}, returning to scope: {self.current_scope.id}")
 
+    def display_table(self):
+        tabulated_table = []
 
+        for symbol in self.symbol_table:
+            tabulated_table.append([
+                symbol.id, symbol.type, symbol.scope.id, symbol.offset
+                ])
+            
+        table_str = tabulate(tabulated_table, 
+                             headers=["ID", "Type", "Scope", "Offset"],
+                             tablefmt="fancy_grid")
+        
+        with open("src/SymbolTable/symbol_table.txt", "w", encoding="utf-8") as f:
+            f.write(table_str)
+
+        self.printf("INFO -> Symbol Table generated successfully")
+            
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
         self.printf("INFO -> Visiting program")
         self.enter_scope("global")  # Enter the global scope
@@ -95,3 +112,8 @@ class TableGenerator(compiscriptVisitor):
         var = Variable(id)              # Create a variable symbol
         self.add_symbol(var)            # Add the variable to the symbol table
         self.visitChildren(ctx)         # Visit the children of the variable declaration
+
+
+    def visitFunDecl(self, ctx:compiscriptParser.FunDeclContext):
+        self.printf("INFO -> Visiting function declaration")
+        id = ctx.IDENTIFIER().getText() # Get the function identifier
