@@ -37,7 +37,7 @@ def main():
                            output_dir='src/ParseTree/Output')
     
     # Create a symbol table generator and visit the parse tree
-    table_generator = TableGenerator(log=True)
+    table_generator = TableGenerator()
     table_generator.visit(parse_tree)
     table_generator.display_table()
 

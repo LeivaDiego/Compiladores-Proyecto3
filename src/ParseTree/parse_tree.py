@@ -105,7 +105,7 @@ class TreeVisualizer:
         # Render the graph to the specified format and path
         self.graph.render(filename=output_path, format=format, cleanup=cleanup)
 
-        print(f"SUCCESS -> Parse tree saved at: {output_path}.{format}")
+        print(f"SUCCESS -> Parse tree generated at: {output_path}.{format}")
 
     
     def generate_name(self, path):
