@@ -43,9 +43,6 @@ class TableGenerator(compiscriptVisitor):
 
         Args:
             symbol (Symbol): A symbol to add to the symbol table
-
-        Returns:
-            None
         """
         symbol.scope = self.current_scope
         symbol.offset = self.offset
@@ -61,9 +58,6 @@ class TableGenerator(compiscriptVisitor):
 
         Args:
             name (str): The name of the scope (default=None)
-
-        Returns:
-            None
         """
         self.scope_counter += 1
         self.current_scope = Scope(name, self.scope_counter)
@@ -75,9 +69,6 @@ class TableGenerator(compiscriptVisitor):
         A helper function to exit the current scope.
         Updates the current scope to the previous scope in the scope stack.
         Pops the current scope from the scope stack.
-
-        Returns:
-            None
         """
         if self.scope_stack:
             exited_scope = self.scope_stack.pop()
@@ -85,6 +76,10 @@ class TableGenerator(compiscriptVisitor):
             self.printf(f"INFO -> Exiting: {exited_scope.id}, returning to scope: {self.current_scope.id}")
 
     def display_table(self):
+        """
+        A helper function to display the symbol table in a tabulated format.
+        Writes the symbol table to a file symbol_table.txt.
+        """
         tabulated_table = []
 
         for symbol in self.symbol_table:
@@ -114,6 +109,18 @@ class TableGenerator(compiscriptVisitor):
         self.visitChildren(ctx)         # Visit the children of the variable declaration
 
 
-    def visitFunDecl(self, ctx:compiscriptParser.FunDeclContext):
-        self.printf("INFO -> Visiting function declaration")
+    def visitFunction(self, ctx:compiscriptParser.FunctionContext):
+        self.printf("INFO -> Visiting function")
         id = ctx.IDENTIFIER().getText() # Get the function identifier
+        func = Function(id)             # Create a function symbol
+        self.add_symbol(func)           # Add the function to the symbol table
+        self.enter_scope(id)            # Enter a new scope with the function name
+        self.visitChildren(ctx)         # Visit the children of the function
+        self.exit_scope()               # Exit the function scope
+
+    def visitParameters(self, ctx:compiscriptParser.ParametersContext):
+        self.printf("INFO -> Visiting parameters")
+        for param in ctx.IDENTIFIER():
+            id = param.getText()                # Get the parameter identifier
+            var = Symbol(id, "param")           # Create a param symbol
+            self.add_symbol(var)                # Add the parameter to the symbol table

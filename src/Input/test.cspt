@@ -1,2 +1,7 @@
-var x = 1;
-var y = "String";
+fun suma(a, b) {
+  var x = "test";
+  return a + b;
+}
+
+
+var sum = suma(3, 4); // Salida: 7
