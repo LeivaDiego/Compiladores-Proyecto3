@@ -1,9 +1,13 @@
-var i = 0;
-var edad = 0;
-while (i < 25) {
-  edad = edad + 1;
-  print "Edad de Juan: " + juan.edad;
-  var x = "test";
+class Persona {
+  init(nombre) {
+    this.nombre = nombre;
+  }
+
+  saludar() {
+    print "Hola, mi nombre es " + this.nombre;
+    var x = "test";
+  }
+
 }
 
-var y;
+var ropero = new Persona("nombre", 20);

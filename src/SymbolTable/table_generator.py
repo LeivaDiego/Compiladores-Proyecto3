@@ -25,8 +25,9 @@ class TableGenerator(compiscriptVisitor):
         self.symbol_table: List[Symbol] = []
         self.current_scope: Scope = None
         self.scope_stack: List[Scope] = []
-        self.scope_counter = 0
+        self.scope_counter = -1
         self.offset = 0
+        self.in_init = False
 
     def printf(self, *args):
         """
@@ -44,7 +45,10 @@ class TableGenerator(compiscriptVisitor):
         Args:
             symbol (Symbol): A symbol to add to the symbol table
         """
-        symbol.scope = self.current_scope
+        if self.current_scope.id == "init" and symbol.type == "attr":
+            symbol.scope = self.scope_stack[-2]
+        else:
+            symbol.scope = self.current_scope
         symbol.offset = self.offset
         self.symbol_table.append(symbol)
         self.offset += 1
@@ -84,17 +88,17 @@ class TableGenerator(compiscriptVisitor):
 
         for symbol in self.symbol_table:
             tabulated_table.append([
-                symbol.id, symbol.type, symbol.scope.id, symbol.offset
+                symbol.id, symbol.type, symbol.scope.id, symbol.scope.index ,symbol.offset
                 ])
             
         table_str = tabulate(tabulated_table, 
-                             headers=["ID", "Type", "Scope", "Offset"],
+                             headers=["ID", "Type", "Scope", "Scope Index", "Offset"],
                              tablefmt="fancy_grid")
         
         with open("src/SymbolTable/symbol_table.txt", "w", encoding="utf-8") as f:
             f.write(table_str)
 
-        self.printf("INFO -> Symbol Table generated successfully")
+        print("SUCCESS -> Symbol Table generated at: src/SymbolTable/symbol_table.txt")
             
 
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
@@ -117,8 +121,14 @@ class TableGenerator(compiscriptVisitor):
         func = Function(id)             # Create a function symbol
         self.add_symbol(func)           # Add the function to the symbol table
         self.enter_scope(id)            # Enter a new scope with the function name
+        
+        # Check if the function is an init function
+        if id == "init" and self.current_scope.id:
+            self.in_init = True
+        
         self.visitChildren(ctx)         # Visit the children of the function
         self.exit_scope()               # Exit the function scope
+
 
     def visitParameters(self, ctx:compiscriptParser.ParametersContext):
         self.printf("INFO -> Visiting parameters")
@@ -151,3 +161,26 @@ class TableGenerator(compiscriptVisitor):
         self.enter_scope("while block")             # Enter a new scope for the while block
         self.visitChildren(ctx)                     # Visit the children of the while statement
         self.exit_scope()                           # Exit the while block scope
+
+
+    def visitClassDecl(self, ctx:compiscriptParser.ClassDeclContext):
+        self.printf("INFO -> Visiting class declaration")
+        id = ctx.IDENTIFIER(0).getText()            # Get the class identifier
+        cls = Class(id)                             # Create a class symbol
+        self.add_symbol(cls)                        # Add the class to the symbol table
+        self.enter_scope(id)                        # Enter a new scope with the class name
+        self.visitChildren(ctx)                     # Visit the children of the class
+        self.exit_scope()                           # Exit the class scope
+
+
+    def visitAssignment(self, ctx:compiscriptParser.AssignmentContext):
+        self.printf("INFO -> Visiting assignment")
+        assignment_str = ctx.getText()              # Get the assignment string
+        # Check if the assignment is an attribute assignment in the init function
+        if self.in_init: 
+            # Check if the assignment is an attribute assignment and not a attribute reference
+            if "this." in assignment_str and "=" in assignment_str:
+                id = assignment_str.split("=")[0].split("this.")[1] # Get the attribute name
+                attr = Symbol(id, "attr")                           # Create an attribute symbol
+                self.add_symbol(attr)                               # Add the attribute to the symbol table
+                self.visitChildren(ctx)                       # Visit the children of the assignment

@@ -27,7 +27,7 @@ class Class(Symbol):
     """
     Class class represents a class in the symbol table
     """
-    def __init__(self, id, type="cls"):
+    def __init__(self, id, type="class"):
         super().__init__(id, type)
         self.methods = []
 
