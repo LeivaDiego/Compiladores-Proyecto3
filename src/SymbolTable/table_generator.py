@@ -96,10 +96,12 @@ class TableGenerator(compiscriptVisitor):
 
         self.printf("INFO -> Symbol Table generated successfully")
             
+
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
         self.printf("INFO -> Visiting program")
         self.enter_scope("global")  # Enter the global scope
         self.visitChildren(ctx)
+
 
     def visitVarDecl(self, ctx:compiscriptParser.VarDeclContext):
         self.printf("INFO -> Visiting variable declaration")
@@ -124,3 +126,14 @@ class TableGenerator(compiscriptVisitor):
             id = param.getText()                # Get the parameter identifier
             var = Symbol(id, "param")           # Create a param symbol
             self.add_symbol(var)                # Add the parameter to the symbol table
+
+
+    def visitIfStmt(self, ctx:compiscriptParser.IfStmtContext):
+        self.printf("INFO -> Visiting if statement")
+        self.enter_scope("if block")                # Enter a new scope for the if block
+        self.visitChildren(ctx.statement(0))        # Visit the children of the if statement
+        self.exit_scope()                           # Exit the if block scope
+        if ctx.statement(1):                        # If there is an else statement
+            self.enter_scope("else block")          # Enter a new scope for the else block
+            self.visitChildren(ctx.statement(1))    # Visit the children of the else statement
+            self.exit_scope()                       # Exit the else block scope

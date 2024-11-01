@@ -1,7 +1,9 @@
-fun suma(a, b) {
-  var x = "test";
-  return a + b;
+for (var i = 1; i <= 10; i = i + 1) {
+  if (i%2 == 0) {
+    print i + " es par";
+    var x = "TEst";
+  } else {
+    print i + " es impar";
+    var y = "test";
+  }
 }
-
-
-var sum = suma(3, 4); // Salida: 7
