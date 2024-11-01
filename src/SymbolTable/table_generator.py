@@ -137,3 +137,17 @@ class TableGenerator(compiscriptVisitor):
             self.enter_scope("else block")          # Enter a new scope for the else block
             self.visitChildren(ctx.statement(1))    # Visit the children of the else statement
             self.exit_scope()                       # Exit the else block scope
+
+
+    def visitForStmt(self, ctx:compiscriptParser.ForStmtContext):
+        self.printf("INFO -> Visiting for statement")
+        self.enter_scope("for block")               # Enter a new scope for the for block
+        self.visitChildren(ctx)                     # Visit the children of the for statement
+        self.exit_scope()                           # Exit the for block scope
+
+
+    def visitWhileStmt(self, ctx:compiscriptParser.WhileStmtContext):
+        self.printf("INFO -> Visiting while statement")
+        self.enter_scope("while block")             # Enter a new scope for the while block
+        self.visitChildren(ctx)                     # Visit the children of the while statement
+        self.exit_scope()                           # Exit the while block scope
