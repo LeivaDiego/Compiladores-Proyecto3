@@ -23,6 +23,7 @@ class TableGenerator(compiscriptVisitor):
         # Helper flags
         self.in_init = False
         self.multi_term = False
+        self.in_assignment = False
 
     def printf(self, *args):
         """
@@ -70,9 +71,18 @@ class TableGenerator(compiscriptVisitor):
         # Add the symbol to the symbol table
         self.symbol_table.append(symbol)
 
-       
-        self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | type: {symbol.data_type.name} | size:{symbol.size} | scope: {symbol.scope.id} | offset: {symbol.offset}")
-
+        # Print the added symbol
+        if isinstance(symbol, Variable):
+            if symbol.type == "instance":
+                self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | scope: {symbol.scope.id} | offset: {symbol.offset} | size: {symbol.size}")
+            else:
+                self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | type: {symbol.data_type.name} | size:{symbol.size} | scope: {symbol.scope.id} | offset: {symbol.offset}")
+        
+        elif isinstance(symbol, Function):
+            self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | scope: {symbol.scope.id}")
+        
+        elif isinstance(symbol, Class):
+            self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | size: {symbol.size} | scope: {symbol.scope.id}")
 
     def search_symbol(self, id, type: Type[Symbol]):
         # Search for the symbol in the symbol table
@@ -174,6 +184,7 @@ class TableGenerator(compiscriptVisitor):
             parameter.type = "param"
             parameter.set_values(AnyType())
             # Add the parameter to the symbol table
+            
             self.add_symbol(parameter)
 
     
@@ -189,7 +200,7 @@ class TableGenerator(compiscriptVisitor):
 
         # Visit the rest of the tree
         self.visitChildren(ctx)
-
+        
         # Add the variable to the symbol table
         self.add_symbol(self.current_variable)
 
@@ -198,6 +209,7 @@ class TableGenerator(compiscriptVisitor):
         self.printf(f"INFO -> Expression: {ctx.getText()}")
         # Visit the rest of the tree
         self.visitChildren(ctx)
+
 
     def visitAssignment(self, ctx:compiscriptParser.AssignmentContext):
         self.printf("VISIT ->  Assignment node")
@@ -211,13 +223,27 @@ class TableGenerator(compiscriptVisitor):
                 attribute_id = ctx.IDENTIFIER().getText()
                 self.printf(f"INFO -> This is an attribute initialization for {attribute_id}")
                 self.current_variable = Variable(attribute_id)    
+                # Visit the rest of the tree
+                self.visitChildren(ctx)
+                self.in_assignment = True
 
         else:
             self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)
 
-        # Visit the rest of the tree
-        self.visitChildren(ctx)
-
+        # Check if the assignment is a attribute initialization
+        if self.in_assignment:
+            self.printf("INFO -> Finished attribute initialization")
+            # Add the attribute to the class
+            self.current_class.attributes.append(self.current_variable)
+            # Add the attribute to the symbol table
+            self.add_symbol(self.current_variable)
+            # Reset the assignment flag
+            self.in_assignment = False
+            # Reset the current variable
+            self.current_variable = None
+        
 
     def visitLogic_or(self, ctx:compiscriptParser.Logic_orContext):
         self.printf("VISIT -> Logic Or node")
@@ -385,81 +411,104 @@ class TableGenerator(compiscriptVisitor):
         self.printf("VISIT -> Primary node")
         # Get the primary text
         primary_text = ctx.getText()
-        # Check if the primary is in a valid assignment context
-        if self.current_variable is not None:
-            # Check if the primary is multiple terms
-            if self.multi_term:
-                self.printf("INFO -> This is a multiple term primary")
-                # Check if the primary is a string
-                if ctx.STRING():
-                    self.printf("INFO -> This is a string")
-                    string_term = ExprTerm(StringType())
-                    self.current_variable.expr_terms.append(string_term)
+        if primary_text != "this":
+            # Check if the primary is in a valid assignment context
+            if self.current_variable is not None:
+                # Check if the primary is multiple terms
+                if self.multi_term:
+                    self.printf("INFO -> This is a multiple term primary")
+                    # Check if the primary is a string
+                    if ctx.STRING():
+                        self.printf("INFO -> This is a string")
+                        string_term = ExprTerm(StringType())
+                        self.current_variable.expr_terms.append(string_term)
 
-                # Check if the primary is a number
-                elif ctx.NUMBER():
-                    self.printf("INFO -> This is a number")
-                    number_term = ExprTerm(NumberType())
-                    self.current_variable.expr_terms.append(number_term)
+                    # Check if the primary is a number
+                    elif ctx.NUMBER():
+                        self.printf("INFO -> This is a number")
+                        number_term = ExprTerm(NumberType())
+                        self.current_variable.expr_terms.append(number_term)
 
-                # Check if the primary is a boolean
-                elif primary_text in ["true", "false"]:
-                    self.printf("INFO -> This is a boolean")
-                    boolean_term = ExprTerm(BooleanType())
-                    self.current_variable.expr_terms.append(boolean_term)
+                    # Check if the primary is a boolean
+                    elif primary_text in ["true", "false"]:
+                        self.printf("INFO -> This is a boolean")
+                        boolean_term = ExprTerm(BooleanType())
+                        self.current_variable.expr_terms.append(boolean_term)
 
-                # Check if the primary is a nil
-                elif primary_text == "nil":
-                    self.printf("INFO -> This is a nil")
-                    nil_term = ExprTerm(NilType())
-                    self.current_variable.expr_terms.append(nil_term)
+                    # Check if the primary is a nil
+                    elif primary_text == "nil":
+                        self.printf("INFO -> This is a nil")
+                        nil_term = ExprTerm(NilType())
+                        self.current_variable.expr_terms.append(nil_term)
 
-                # Check if the primary is an identifier
-                elif ctx.IDENTIFIER():
-                    self.printf("INFO -> This is an identifier")
-                    symbol = self.search_symbol(primary_text, Symbol)
-                    if symbol:
-                        identifier_term = ExprTerm(symbol.data_type)
-                        self.current_variable.expr_terms.append(identifier_term)
-                    else:
-                        self.printf(f"ERROR -> Identifier {primary_text} not found")
+                    # Check if the primary is an identifier
+                    elif ctx.IDENTIFIER():
+                        self.printf("INFO -> This is an identifier")
+                        symbol = self.search_symbol(primary_text, Symbol)
+                        if symbol:
+                            identifier_term = ExprTerm(symbol.data_type)
+                            self.current_variable.expr_terms.append(identifier_term)
+                        else:
+                            self.printf(f"ERROR -> Identifier {primary_text} not found")
 
-            else:
-                # If the primary is not multiple terms set the data type of the variable
-                self.printf("INFO -> This is a single term primary")
-                # Check if the primary is a string
-                if ctx.STRING():
-                    self.current_variable.set_values(StringType())
-
-                # Check if the primary is a number
-                elif ctx.NUMBER():
-                    self.current_variable.set_values(NumberType())
-
-                # Check if the primary is a boolean
-                elif primary_text in ["true", "false"]:
-                    self.current_variable.set_values(BooleanType())
-
-                # Check if the primary is a nil
-                elif primary_text == "nil":
-                    self.current_variable.set_values(NilType())
-
-                # Check if the primary is an identifier
-                elif ctx.IDENTIFIER():
-                    symbol = self.search_symbol(primary_text, Symbol)
-                    if symbol:
-                        self.current_variable.set_values(symbol.data_type)
-                    else:
-                        raise Exception(f"ERROR -> Identifier {primary_text} not found")
-
-                # Check if primary is a instantiation
-                elif ctx.instantiation():
-                    # Visit the rest of the tree
-                    self.visitChildren(ctx)
-
-                # Check for expressions
-                elif ctx.expression():
-                    # Visit the rest of the tree
-                    self.visitChildren(ctx)
-                
                 else:
-                    raise Exception(f"ERROR -> No type found for primary {primary_text}")
+                    # If the primary is not multiple terms set the data type of the variable
+                    self.printf("INFO -> This is a single term primary")
+                    # Check if the primary is a string
+                    if ctx.STRING():
+                        self.current_variable.set_values(StringType())
+
+                    # Check if the primary is a number
+                    elif ctx.NUMBER():
+                        self.current_variable.set_values(NumberType())
+
+                    # Check if the primary is a boolean
+                    elif primary_text in ["true", "false"]:
+                        self.current_variable.set_values(BooleanType())
+
+                    # Check if the primary is a nil
+                    elif primary_text == "nil":
+                        self.current_variable.set_values(NilType())
+
+                    # Check if the primary is an identifier
+                    elif ctx.IDENTIFIER():
+                        symbol = self.search_symbol(primary_text, Symbol)
+                        if symbol:
+                            self.current_variable.set_values(symbol.data_type)
+                        else:
+                            raise Exception(f"ERROR -> Identifier {primary_text} not found")
+
+                    # Check if primary is a instantiation
+                    elif ctx.instantiation():
+                        # Visit the rest of the tree
+                        self.visitChildren(ctx)
+
+                    # Check for expressions
+                    elif ctx.expression():
+                        # Visit the rest of the tree
+                        self.visitChildren(ctx)
+                    
+                    else:
+                        raise Exception(f"ERROR -> No type found for primary {primary_text}")
+                    
+        else:
+            self.printf("INFO -> Skipping primary node since it is a 'this' keyword")
+                
+
+    def visitInstantiation(self, ctx:compiscriptParser.InstantiationContext):
+        self.printf("VISIT -> Instantiation node")
+
+        # Get the instantiation id
+        instantiation_id = ctx.IDENTIFIER().getText()
+
+        self.printf(f"INFO -> Creating instantiation: {instantiation_id}")
+
+        # Check if the instantiation is in a valid assignment context
+        if self.current_variable is not None:
+            # Check if the instantiation is a class
+            class_symbol = self.search_symbol(instantiation_id, Class)
+            if class_symbol:
+                self.current_variable.type = "instance"
+                self.current_variable.size = class_symbol.size
+            else:
+                raise Exception(f"ERROR -> Class {instantiation_id} not found")

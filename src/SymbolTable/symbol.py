@@ -20,8 +20,8 @@ class Variable(Symbol):
     """
     def __init__(self, id, type="var"):
         super().__init__(id, type)
-        self.data_type = None
         self.expr_terms: List[ExprTerm]= []
+
 
     def set_values(self, data_type: DataType):
         """
@@ -29,6 +29,7 @@ class Variable(Symbol):
         """
         self.data_type = data_type
         self.size = data_type.size
+
 
     def resolve_expr_type(self):
         if any(term.data_type.name == "str" for term in self.expr_terms):
