@@ -302,8 +302,13 @@ class TableGenerator(compiscriptVisitor):
                         self.printf("INFO -> Found - operator, Setting data type for term")
                         self.current_variable.set_values(NumberType())
                         return
+                    
                     elif node.getText() == "+":
                         self.printf("INFO -> Found + operator need to check if it is a string concatenation")
+                
+                # Check if the variable is a string
+                self.visitChildren(ctx)
+                
         else:
             self.printf("INFO -> This is a wrapper node")
             # Visit the rest of the tree
