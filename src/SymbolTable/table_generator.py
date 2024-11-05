@@ -330,3 +330,26 @@ class TableGenerator(compiscriptVisitor):
             self.printf("INFO -> This is a wrapper node")
             # Visit the rest of the tree
             self.visitChildren(ctx)
+
+
+    def visitUnary(self, ctx:compiscriptParser.UnaryContext):
+        self.printf("VISIT -> Unary node")
+        
+        # Check if the unary is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid unary")
+            # Check if we are in a valid assignment context
+            if self.current_variable is not None:
+                # Check if its negation or negative
+                self.printf("INFO -> Setting data type for unary")
+                # If the unary is a negative operator set the data type to number
+                if ctx.getChild(0).getText() == "-":
+                    self.current_variable.set_values(NumberType())
+                # If the unary is a negation operator set the data type to boolean
+                elif ctx.getChild(0).getText() == "!":
+                    self.current_variable.set_values(BooleanType())
+                
+        else:
+            self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)
