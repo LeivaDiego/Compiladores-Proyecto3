@@ -20,14 +20,9 @@ class TableGenerator(compiscriptVisitor):
         self.current_class: Class = None
         self.current_function: Function = None
         self.current_variable: Variable = None
-        self.current_attribute: Variable = None
 
         # Helper flags
         self.in_init = False
-        self.in_class = False
-        self.in_function = False
-        self.in_variable = False
-        self.visited = False
 
 
     def printf(self, *args):
@@ -77,7 +72,7 @@ class TableGenerator(compiscriptVisitor):
         self.symbol_table.append(symbol)
 
        
-        self.printf(f"INFO -> Adding {symbol.type}: {symbol.id} to scope: {symbol.scope.id}")
+        self.printf(f"INFO -> Adding {symbol.type}: {symbol.id} - type: {symbol.data_type.name} - to scope: {symbol.scope.id}")
 
 
     def search_symbol(self, id, type: Type[Symbol]):
@@ -98,9 +93,6 @@ class TableGenerator(compiscriptVisitor):
 
     def visitClassDecl(self, ctx:compiscriptParser.ClassDeclContext):
         self.printf("INFO -> Visiting Class Declaration")
-        # Set the class flag
-        self.in_class = True
-
         # Get the class id
         class_id = ctx.IDENTIFIER(0).getText()
         parent_class = None
@@ -137,21 +129,18 @@ class TableGenerator(compiscriptVisitor):
         self.exit_scope()
 
         # Reset the class flag
-        self.in_class = False
         self.current_class = None
 
 
     def visitFunction(self, ctx:compiscriptParser.FunctionContext):
         self.printf("INFO -> Visiting Function Declaration")
-        # Set the function flag
-        self.in_function = True
         
         # Get the function id
         function_id = ctx.IDENTIFIER().getText()
         self.printf(f"INFO -> Creating function: {function_id}")
         
         # Check if the function is a constructor
-        if function_id == "init" and self.in_class:
+        if function_id == "init" and self.current_class is not None:
             self.printf(f"INFO -> This function is a Constructor for class: {self.current_scope.id}")
             self.in_init = True
 
@@ -170,7 +159,6 @@ class TableGenerator(compiscriptVisitor):
         # Exit the function scope
         self.exit_scope()
         # Reset the function flag
-        self.in_function = False
         self.in_init = False
 
 
@@ -205,3 +193,45 @@ class TableGenerator(compiscriptVisitor):
 
         # Add the variable to the symbol table
         self.add_symbol(self.current_variable)
+
+    def visitExpression(self, ctx:compiscriptParser.ExpressionContext):
+        expression_str = ctx.getText()
+        self.printf(f"INFO -> Visiting Expression: {expression_str}")
+        # Visit the rest of the tree
+        self.visitChildren(ctx)
+
+    def visitAssignment(self, ctx:compiscriptParser.AssignmentContext):
+        self.printf("INFO -> Visiting Assignment")
+        
+        # Check if the assignment is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid assignment")
+            # Check if the assingment is a attribute initialization
+            if self.in_init and self.current_class is not None:
+                # Get the attribute id
+                attribute_id = ctx.IDENTIFIER().getText()
+                self.printf(f"INFO -> This is an attribute initialization for {attribute_id}")
+                self.current_variable = Variable(attribute_id)    
+
+        else:
+            self.printf("INFO -> This is a wrapper node")
+
+        # Visit the rest of the tree
+        self.visitChildren(ctx)
+
+
+    def visitLogic_or(self, ctx:compiscriptParser.Logic_orContext):
+        self.printf("INFO -> Visiting Logic Or")
+        
+        # Check if the logic or is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid logic or")
+            # Check if we are in a valid assignment context
+            if self.current_variable is not None:
+                # Set the data type of the variable
+                self.current_variable.set_values(BooleanType())
+        else:
+            self.printf("INFO -> This is a wrapper node")
+
+        # Visit the rest of the tree
+        self.visitChildren(ctx)
