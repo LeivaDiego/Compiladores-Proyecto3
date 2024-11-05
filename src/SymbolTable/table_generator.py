@@ -71,7 +71,7 @@ class TableGenerator(compiscriptVisitor):
         self.symbol_table.append(symbol)
 
        
-        self.printf(f"INFO -> Adding {symbol.type}: {symbol.id} - type: {symbol.data_type.name} - to scope: {symbol.scope.id}")
+        self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | type: {symbol.data_type.name} | size:{symbol.size} | scope: {symbol.scope.id} | offset: {symbol.offset}")
 
 
     def search_symbol(self, id, type: Type[Symbol]):
@@ -83,7 +83,7 @@ class TableGenerator(compiscriptVisitor):
 
 
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
-        self.printf("INFO -> Visiting Program")
+        self.printf("VISIT -> Program node")
         # Enter the global scope
         self.enter_scope("global")
         # Visit the rest of the tree
@@ -91,7 +91,7 @@ class TableGenerator(compiscriptVisitor):
 
 
     def visitClassDecl(self, ctx:compiscriptParser.ClassDeclContext):
-        self.printf("INFO -> Visiting Class Declaration")
+        self.printf("VISIT -> Class Declaration node")
         # Get the class id
         class_id = ctx.IDENTIFIER(0).getText()
         parent_class = None
@@ -132,7 +132,7 @@ class TableGenerator(compiscriptVisitor):
 
 
     def visitFunction(self, ctx:compiscriptParser.FunctionContext):
-        self.printf("INFO -> Visiting Function Declaration")
+        self.printf("VISIT -> Function Declaration node")
         
         # Get the function id
         function_id = ctx.IDENTIFIER().getText()
@@ -162,7 +162,7 @@ class TableGenerator(compiscriptVisitor):
 
 
     def visitParameters(self, ctx:compiscriptParser.ParametersContext):
-        self.printf("INFO -> Visiting Parameters")
+        self.printf("VISIT -> Parameters node")
         
         # Get the parameters
         for param in ctx.IDENTIFIER():
@@ -178,7 +178,7 @@ class TableGenerator(compiscriptVisitor):
 
     
     def visitVarDecl(self, ctx:compiscriptParser.VarDeclContext):
-        self.printf("INFO -> Visiting Variable Declaration")
+        self.printf("VISIT -> Variable Declaration node")
 
         # Get the variable id
         variable_id = ctx.IDENTIFIER().getText()
@@ -194,13 +194,13 @@ class TableGenerator(compiscriptVisitor):
         self.add_symbol(self.current_variable)
 
     def visitExpression(self, ctx:compiscriptParser.ExpressionContext):
-        expression_str = ctx.getText()
-        self.printf(f"INFO -> Visiting Expression: {expression_str}")
+        self.printf(f"VISIT -> Expression node")
+        self.printf(f"INFO -> Expression: {ctx.getText()}")
         # Visit the rest of the tree
         self.visitChildren(ctx)
 
     def visitAssignment(self, ctx:compiscriptParser.AssignmentContext):
-        self.printf("INFO -> Visiting Assignment")
+        self.printf("VISIT ->  Assignment node")
         
         # Check if the assignment is not a wrapper node
         if ctx.getChildCount() > 1:
@@ -220,7 +220,7 @@ class TableGenerator(compiscriptVisitor):
 
 
     def visitLogic_or(self, ctx:compiscriptParser.Logic_orContext):
-        self.printf("INFO -> Visiting Logic Or")
+        self.printf("VISIT -> Logic Or node")
         
         # Check if the logic or is not a wrapper node
         if ctx.getChildCount() > 1:
@@ -228,7 +228,7 @@ class TableGenerator(compiscriptVisitor):
             # Check if we are in a valid assignment context
             if self.current_variable is not None:
                 # Set the data type of the variable
-                self.printf("Setting data type for logic or")
+                self.printf("INFO -> Setting data type for logic or")
                 self.current_variable.set_values(BooleanType())
         else:
             self.printf("INFO -> This is a wrapper node")
@@ -237,7 +237,7 @@ class TableGenerator(compiscriptVisitor):
 
 
     def visitLogic_and(self, ctx:compiscriptParser.Logic_andContext):
-        self.printf("INFO -> Visiting Logic And")
+        self.printf("VISIT -> Logic And node")
         
         # Check if the logic and is not a wrapper node
         if ctx.getChildCount() > 1:
@@ -245,7 +245,24 @@ class TableGenerator(compiscriptVisitor):
             # Check if we are in a valid assignment context
             if self.current_variable is not None:
                 # Set the data type of the variable
-                self.printf("Setting data type for logic and")
+                self.printf("INFO -> Setting data type for logic and")
+                self.current_variable.set_values(BooleanType())
+        else:
+            self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)
+
+
+    def visitEquality(self, ctx:compiscriptParser.EqualityContext):
+        self.printf("VISIT -> Equality node")
+        
+        # Check if the equality is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid equality")
+            # Check if we are in a valid assignment context
+            if self.current_variable is not None:
+                # Set the data type of the variable
+                self.printf("INFO -> Setting data type for equality")
                 self.current_variable.set_values(BooleanType())
         else:
             self.printf("INFO -> This is a wrapper node")
