@@ -1,7 +1,7 @@
 from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SymbolTable.symbol import Symbol, Variable, Function, Class, Scope, ExprTerm
-from SymbolTable.types import DataType, AnyType, BooleanType, NumberType, StringType, NilType
+from SymbolTable.types import AnyType, BooleanType, NumberType, StringType, NilType, InstanceType
 from tabulate import tabulate
 from typing import List, Type
 
@@ -24,6 +24,42 @@ class TableGenerator(compiscriptVisitor):
         self.in_init = False
         self.multi_term = False
         self.in_assignment = False
+
+    def display_table(self):
+        formatted_symbols = []
+
+        # Table headers
+        headers = ["ID", "Type", "Scope", "Scope Index", "Data Type", "Size", "Offset"]
+
+        # format the symbols for display
+        self.printf("INFO -> Formatting symbols for display")
+        for symbol in self.symbol_table:
+            symbol_data = [
+                symbol.id,
+                symbol.type,
+                symbol.scope.id,
+                symbol.scope.index,
+                symbol.data_type.name if symbol.data_type is not None else "-",
+                symbol.size if symbol.size is not None else "-",
+                symbol.offset if symbol.offset is not None else "-"
+            ]
+            # Append the formatted symbol to the list
+            formatted_symbols.append(symbol_data)
+
+        # Create a table with the formatted symbols and headers
+        # using the tabulate library
+        display_table = tabulate(formatted_symbols, headers, tablefmt="fancy_grid")
+
+        with open("src/SymbolTable/symbol_table.txt", "w", encoding="utf8") as f:
+            f.write(display_table)
+
+        print("SUCCESS -> Symbol table has been written to src/SymbolTable/symbol_table.txt")
+
+
+        
+
+        
+
 
     def printf(self, *args):
         """
@@ -73,17 +109,21 @@ class TableGenerator(compiscriptVisitor):
 
         # Print the added symbol
         if isinstance(symbol, Variable):
-            if symbol.type == "instance":
-                self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | scope: {symbol.scope.id} | offset: {symbol.offset} | size: {symbol.size}")
-            else:
-                self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | type: {symbol.data_type.name} | size:{symbol.size} | scope: {symbol.scope.id} | offset: {symbol.offset}")
-        
+            self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | type: {symbol.data_type.name} | size:{symbol.size} | scope: {symbol.scope.id} | offset: {symbol.offset}")
+            # Reset the current variable
+            self.current_variable = None
+
         elif isinstance(symbol, Function):
             self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | scope: {symbol.scope.id}")
-        
+            # Reset the current function
+            self.current_function = None
+
         elif isinstance(symbol, Class):
             self.printf(f"ADDED SYMBOL -> {symbol.type}: {symbol.id} | size: {symbol.size} | scope: {symbol.scope.id}")
+            # Reset the current class
+            self.current_class = None
 
+        
     def search_symbol(self, id, type: Type[Symbol]):
         # Search for the symbol in the symbol table
         for symbol in reversed(self.symbol_table):
@@ -241,8 +281,6 @@ class TableGenerator(compiscriptVisitor):
             self.add_symbol(self.current_variable)
             # Reset the assignment flag
             self.in_assignment = False
-            # Reset the current variable
-            self.current_variable = None
         
 
     def visitLogic_or(self, ctx:compiscriptParser.Logic_orContext):
@@ -449,7 +487,7 @@ class TableGenerator(compiscriptVisitor):
                             identifier_term = ExprTerm(symbol.data_type)
                             self.current_variable.expr_terms.append(identifier_term)
                         else:
-                            self.printf(f"ERROR -> Identifier {primary_text} not found")
+                            raise Exception(f"Identifier {primary_text} not found")
 
                 else:
                     # If the primary is not multiple terms set the data type of the variable
@@ -476,7 +514,7 @@ class TableGenerator(compiscriptVisitor):
                         if symbol:
                             self.current_variable.set_values(symbol.data_type)
                         else:
-                            raise Exception(f"ERROR -> Identifier {primary_text} not found")
+                            raise Exception(f"Identifier {primary_text} not found")
 
                     # Check if primary is a instantiation
                     elif ctx.instantiation():
@@ -489,7 +527,7 @@ class TableGenerator(compiscriptVisitor):
                         self.visitChildren(ctx)
                     
                     else:
-                        raise Exception(f"ERROR -> No type found for primary {primary_text}")
+                        raise Exception(f"No type found for primary {primary_text}")
                     
         else:
             self.printf("INFO -> Skipping primary node since it is a 'this' keyword")
@@ -508,7 +546,7 @@ class TableGenerator(compiscriptVisitor):
             # Check if the instantiation is a class
             class_symbol = self.search_symbol(instantiation_id, Class)
             if class_symbol:
-                self.current_variable.type = "instance"
+                self.current_variable.data_type = InstanceType()
                 self.current_variable.size = class_symbol.size
             else:
-                raise Exception(f"ERROR -> Class {instantiation_id} not found")
+                raise Exception(f"Class {instantiation_id} not found")

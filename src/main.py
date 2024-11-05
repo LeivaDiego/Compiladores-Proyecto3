@@ -2,7 +2,7 @@ from CompiScript.compiscriptLexer import compiscriptLexer
 from CompiScript.compiscriptParser import compiscriptParser
 from antlr4 import FileStream, CommonTokenStream
 from ParseTree.parse_tree import TreeVisualizer
-from antlr4.error.ErrorStrategy import DefaultErrorStrategy
+from antlr4.error.ErrorStrategy import DefaultErrorStrategy, ParseCancellationException
 from Utils.custom_exception import ThrowingErrorListener
 from SymbolTable.table_generator import TableGenerator
 
@@ -39,11 +39,13 @@ def main():
     # Create a symbol table generator and visit the parse tree
     table_generator = TableGenerator(logging=True)
     table_generator.visit(parse_tree)
-    # table_generator.display_table()
+    table_generator.display_table()
 
 
 if __name__ == '__main__':
     try:
         main()
-    except Exception as e:
+    except ParseCancellationException as e:
         print(e)
+    except Exception as e:
+        print(f"ERROR -> {e}")

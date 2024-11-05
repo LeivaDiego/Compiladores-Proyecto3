@@ -3,6 +3,13 @@ class DataType():
         self.name = name
         self.size = size
 
+    def __str__(self):
+        return self.name
+
+class InstanceType():
+    def __init__(self, name="instance"):
+        self.name = name
+        
 class AnyType(DataType):
     def __init__(self, name="any", size=10):
         super().__init__(name, size)
