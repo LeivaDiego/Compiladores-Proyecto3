@@ -268,3 +268,20 @@ class TableGenerator(compiscriptVisitor):
             self.printf("INFO -> This is a wrapper node")
             # Visit the rest of the tree
             self.visitChildren(ctx)
+
+    
+    def visitComparison(self, ctx:compiscriptParser.ComparisonContext):
+        self.printf("VISIT -> Comparison node")
+        
+        # Check if the comparison is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid comparison")
+            # Check if we are in a valid assignment context
+            if self.current_variable is not None:
+                # Set the data type of the variable
+                self.printf("INFO -> Setting data type for comparison")
+                self.current_variable.set_values(BooleanType())
+        else:
+            self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)

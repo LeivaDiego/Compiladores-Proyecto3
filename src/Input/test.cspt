@@ -1,2 +1,1 @@
-var test = i % 2 == 1;
-var test2 = a != b and test;
+i <= 5;
