@@ -53,12 +53,6 @@ class Class(Symbol):
         if self.parent:
             self.attributes += self.parent.attributes
     
-    def get_parent_methods(self):
-        """
-        Get the methods of the parent class
-        """
-        if self.parent:
-            self.methods += self.parent.methods
 
     def set_size(self):
         """

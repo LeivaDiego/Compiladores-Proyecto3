@@ -1,7 +1,8 @@
 from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SymbolTable.symbol import Symbol, Variable, Function, Class, Scope
-from SymbolTable.types import DataType, AnyType
+from SymbolTable.types import DataType, AnyType, BooleanType, NumberType, StringType, NilType
+from Utils.regex_controller import trim_expression
 from tabulate import tabulate
 from typing import List, Type
 
@@ -19,12 +20,14 @@ class TableGenerator(compiscriptVisitor):
         self.current_class: Class = None
         self.current_function: Function = None
         self.current_variable: Variable = None
+        self.current_attribute: Variable = None
 
         # Helper flags
         self.in_init = False
         self.in_class = False
         self.in_function = False
         self.in_variable = False
+        self.visited = False
 
 
     def printf(self, *args):
@@ -73,9 +76,8 @@ class TableGenerator(compiscriptVisitor):
         # Add the symbol to the symbol table
         self.symbol_table.append(symbol)
 
-        # Print a message indicating the type of symbol added
-        symbol_type = type(symbol).__name__.lower()
-        self.printf(f"INFO -> Adding {symbol_type}: {symbol.id} to scope: {symbol.scope.id}")
+       
+        self.printf(f"INFO -> Adding {symbol.type}: {symbol.id} to scope: {symbol.scope.id}")
 
 
     def search_symbol(self, id, type: Type[Symbol]):
@@ -84,6 +86,7 @@ class TableGenerator(compiscriptVisitor):
             if symbol.id == id and isinstance(symbol, type):
                 return symbol
         return None
+
 
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
         self.printf("INFO -> Visiting Program")
@@ -112,15 +115,11 @@ class TableGenerator(compiscriptVisitor):
         # Create a new class symbol
         if parent_class is not None:
             self.printf(f"INFO -> Inheriting from: {parent_class.id}")
-            new_class = Class(class_id, parent=parent_class)
+            self.current_class = Class(class_id, parent=parent_class)
             # Get the attributes and methods of the parent class
-            new_class.get_parent_attributes()
-            new_class.get_parent_methods()
+            self.current_class.get_parent_attributes()
         else:
-            new_class = Class(class_id)
-
-        # Set the current class
-        self.current_class = new_class
+            self.current_class = Class(class_id)
 
         # Enter the class scope
         self.enter_scope(class_id)
@@ -144,7 +143,9 @@ class TableGenerator(compiscriptVisitor):
 
     def visitFunction(self, ctx:compiscriptParser.FunctionContext):
         self.printf("INFO -> Visiting Function Declaration")
-
+        # Set the function flag
+        self.in_function = True
+        
         # Get the function id
         function_id = ctx.IDENTIFIER().getText()
         self.printf(f"INFO -> Creating function: {function_id}")
@@ -155,7 +156,7 @@ class TableGenerator(compiscriptVisitor):
             self.in_init = True
 
         # Create a new function symbol
-        new_function = Function(function_id)
+        self.current_function = Function(function_id)
 
         # Enter the function scope
         self.enter_scope(function_id)
@@ -164,10 +165,13 @@ class TableGenerator(compiscriptVisitor):
         self.visitChildren(ctx)
 
         # Add the function to the symbol table
-        self.add_symbol(new_function)
+        self.add_symbol(self.current_function)
 
         # Exit the function scope
         self.exit_scope()
+        # Reset the function flag
+        self.in_function = False
+        self.in_init = False
 
 
     def visitParameters(self, ctx:compiscriptParser.ParametersContext):
@@ -184,3 +188,20 @@ class TableGenerator(compiscriptVisitor):
             parameter.set_values(AnyType())
             # Add the parameter to the symbol table
             self.add_symbol(parameter)
+
+    
+    def visitVarDecl(self, ctx:compiscriptParser.VarDeclContext):
+        self.printf("INFO -> Visiting Variable Declaration")
+
+        # Get the variable id
+        variable_id = ctx.IDENTIFIER().getText()
+        self.printf(f"INFO -> Creating variable: {variable_id}")
+
+        # Create a new variable symbol
+        self.current_variable = Variable(variable_id)
+
+        # Visit the rest of the tree
+        self.visitChildren(ctx)
+
+        # Add the variable to the symbol table
+        self.add_symbol(self.current_variable)
