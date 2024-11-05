@@ -6,6 +6,46 @@ from tabulate import tabulate
 from typing import List, Type
 
 class TableGenerator(compiscriptVisitor):
+    """
+    TableGenerator class is a visitor class that traverses the parse tree
+    and generates a symbol table for the CompiScript language.
+
+    The symbol table is a list of symbols that are created during the traversal
+    of the parse tree. The symbol table is then displayed in a tabular format
+    using the tabulate library.
+
+    The symbol table contains the following information for each symbol:
+    - ID: The identifier of the symbol
+    - Type: The type of the symbol (Variable, Function, Class)
+    - Scope: The scope of the symbol
+    - Scope Index: The index of the scope in the scope stack
+    - Data Type: The data type of the symbol
+    - Size: The size of the symbol
+    - Offset: The offset of the symbol in the scope
+
+    The TableGenerator class also handles the scoping of the symbols and
+    the creation of the symbols in the symbol table based on the context of the
+    parse tree nodes.
+
+    The TableGenerator class also handles the logic for type inference of the variables
+    based on the expressions in the parse tree.
+
+
+    Args:
+        - logging: A flag to enable logging for debugging purposes
+
+    Attributes:
+        - logging: A flag to enable logging for debugging purposes
+        - symbol_table: A list of symbols in the symbol table
+        - current_scope: The current scope in the symbol table
+        - scope_stack: A stack of scopes in the symbol table
+        - current_class: The current class being processed
+        - current_function: The current function being processed
+        - current_variable: The current variable being processed
+        - in_init: A flag to indicate if the current function is a constructor
+        - multi_term: A flag to indicate if the current expression has multiple terms
+        - in_assignment: A flag to indicate if the current context is an assignment
+    """
     def __init__(self, logging=False):
         # Logging flag
         self.logging = logging
@@ -56,11 +96,6 @@ class TableGenerator(compiscriptVisitor):
         print("SUCCESS -> Symbol table has been written to src/SymbolTable/symbol_table.txt")
 
 
-        
-
-        
-
-
     def printf(self, *args):
         """
         A helper function to print messages if logging is enabled.
@@ -89,7 +124,7 @@ class TableGenerator(compiscriptVisitor):
 
     def add_symbol(self, symbol: Symbol):
         # Determine if the symbol is a variable in a class initialization
-        if isinstance(symbol,(Variable)) and self.in_init:
+        if isinstance(symbol,(Variable)) and self.in_init and symbol.type == "attr":
             # Variables in init have their scope set to the class scope
             symbol.scope = self.scope_stack[-2]
         elif isinstance(symbol, (Function, Class)):
@@ -244,6 +279,7 @@ class TableGenerator(compiscriptVisitor):
         # Add the variable to the symbol table
         self.add_symbol(self.current_variable)
 
+
     def visitExpression(self, ctx:compiscriptParser.ExpressionContext):
         self.printf(f"VISIT -> Expression node")
         self.printf(f"INFO -> Expression: {ctx.getText()}")
@@ -252,7 +288,7 @@ class TableGenerator(compiscriptVisitor):
 
 
     def visitAssignment(self, ctx:compiscriptParser.AssignmentContext):
-        self.printf("VISIT ->  Assignment node")
+        self.printf("VISIT -> Assignment node")
         
         # Check if the assignment is not a wrapper node
         if ctx.getChildCount() > 1:
@@ -262,7 +298,7 @@ class TableGenerator(compiscriptVisitor):
                 # Get the attribute id
                 attribute_id = ctx.IDENTIFIER().getText()
                 self.printf(f"INFO -> This is an attribute initialization for {attribute_id}")
-                self.current_variable = Variable(attribute_id)    
+                self.current_variable = Variable(attribute_id)
                 # Visit the rest of the tree
                 self.visitChildren(ctx)
                 self.in_assignment = True
@@ -277,6 +313,7 @@ class TableGenerator(compiscriptVisitor):
             self.printf("INFO -> Finished attribute initialization")
             # Add the attribute to the class
             self.current_class.attributes.append(self.current_variable)
+            self.current_variable.type = "attr"
             # Add the attribute to the symbol table
             self.add_symbol(self.current_variable)
             # Reset the assignment flag
@@ -550,3 +587,43 @@ class TableGenerator(compiscriptVisitor):
                 self.current_variable.size = class_symbol.size
             else:
                 raise Exception(f"Class {instantiation_id} not found")
+            
+    
+    def visitIfStmt(self, ctx:compiscriptParser.IfStmtContext):
+        self.printf("VISIT -> If Statement node")
+        # Enter the if scope
+        self.enter_scope("if block")
+        # Visit the rest of the if statement block
+        self.visitChildren(ctx.statement(0))
+        # Exit the if scope
+        self.exit_scope()
+
+        # Check if there is an else block
+        if ctx.statement(1):
+            self.printf("INFO -> Else block found")
+            # Enter the else scope
+            self.enter_scope("else block")
+            # Visit the rest of the else statement block
+            self.visitChildren(ctx.statement(1))
+            # Exit the else scope
+            self.exit_scope()
+
+
+    def visitForStmt(self, ctx:compiscriptParser.ForStmtContext):
+        self.printf("VISIT -> For Statement node")
+        # Enter the for scope
+        self.enter_scope("for block")
+        # Visit the rest of the for statement block
+        self.visitChildren(ctx)
+        # Exit the for scope
+        self.exit_scope()
+
+
+    def visitWhileStmt(self, ctx:compiscriptParser.WhileStmtContext):
+        self.printf("VISIT -> While Statement node")
+        # Enter the while scope
+        self.enter_scope("while block")
+        # Visit the rest of the while statement block
+        self.visitChildren(ctx)
+        # Exit the while scope
+        self.exit_scope()
