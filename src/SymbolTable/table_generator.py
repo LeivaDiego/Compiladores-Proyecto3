@@ -2,7 +2,6 @@ from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SymbolTable.symbol import Symbol, Variable, Function, Class, Scope
 from SymbolTable.types import DataType, AnyType, BooleanType, NumberType, StringType, NilType
-from Utils.regex_controller import trim_expression
 from tabulate import tabulate
 from typing import List, Type
 
@@ -229,9 +228,26 @@ class TableGenerator(compiscriptVisitor):
             # Check if we are in a valid assignment context
             if self.current_variable is not None:
                 # Set the data type of the variable
+                self.printf("Setting data type for logic or")
                 self.current_variable.set_values(BooleanType())
         else:
             self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)
 
-        # Visit the rest of the tree
-        self.visitChildren(ctx)
+
+    def visitLogic_and(self, ctx:compiscriptParser.Logic_andContext):
+        self.printf("INFO -> Visiting Logic And")
+        
+        # Check if the logic and is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid logic and")
+            # Check if we are in a valid assignment context
+            if self.current_variable is not None:
+                # Set the data type of the variable
+                self.printf("Setting data type for logic and")
+                self.current_variable.set_values(BooleanType())
+        else:
+            self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)

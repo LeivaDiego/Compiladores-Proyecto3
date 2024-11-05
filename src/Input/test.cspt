@@ -1,1 +1,1 @@
-var test = i % 2 == 0 or x / 2 > 3 or y;
+var test = i % 2 == 0 or x / 2 > 3 and y;
