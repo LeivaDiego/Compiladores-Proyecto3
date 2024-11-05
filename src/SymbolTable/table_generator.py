@@ -1,6 +1,7 @@
 from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SymbolTable.symbol import Symbol, Variable, Function, Class, Scope
+from SymbolTable.types import DataType, AnyType
 from tabulate import tabulate
 from typing import List, Type
 
@@ -13,6 +14,11 @@ class TableGenerator(compiscriptVisitor):
         self.symbol_table: List[Symbol] = []
         self.current_scope: Scope = None
         self.scope_stack: List[Scope] = []
+
+        # Symbol helper
+        self.current_class: Class = None
+        self.current_function: Function = None
+        self.current_variable: Variable = None
 
         # Helper flags
         self.in_init = False
@@ -113,6 +119,9 @@ class TableGenerator(compiscriptVisitor):
         else:
             new_class = Class(class_id)
 
+        # Set the current class
+        self.current_class = new_class
+
         # Enter the class scope
         self.enter_scope(class_id)
 
@@ -120,22 +129,21 @@ class TableGenerator(compiscriptVisitor):
         self.visitChildren(ctx)
 
         # Set the size of the class
-        new_class.set_size()
+        self.current_class.set_size()
 
         # Add the class to the symbol table
-        self.add_symbol(new_class)
+        self.add_symbol(self.current_class)
 
         # Exit the class scope
         self.exit_scope()
 
         # Reset the class flag
         self.in_class = False
+        self.current_class = None
 
 
     def visitFunction(self, ctx:compiscriptParser.FunctionContext):
         self.printf("INFO -> Visiting Function Declaration")
-        # Set the function flag
-        self.in_function = True
 
         # Get the function id
         function_id = ctx.IDENTIFIER().getText()
@@ -155,15 +163,24 @@ class TableGenerator(compiscriptVisitor):
         # Visit the rest of the tree
         self.visitChildren(ctx)
 
-        # Add the function to the class methods if in a class
-        if self.in_class:
-            self.current_scope.parent.methods.append(new_function)
-            
         # Add the function to the symbol table
         self.add_symbol(new_function)
 
         # Exit the function scope
         self.exit_scope()
 
-        # Reset the function flag
-        self.in_function = False
+
+    def visitParameters(self, ctx:compiscriptParser.ParametersContext):
+        self.printf("INFO -> Visiting Parameters")
+        
+        # Get the parameters
+        for param in ctx.IDENTIFIER():
+            # Get the parameter id
+            param_id = param.getText()
+            # Create a new variable symbol
+            parameter = Variable(param_id)
+            # Set the data type of the parameter to AnyType
+            parameter.type = "param"
+            parameter.set_values(AnyType())
+            # Add the parameter to the symbol table
+            self.add_symbol(parameter)

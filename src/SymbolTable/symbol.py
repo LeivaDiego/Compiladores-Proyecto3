@@ -36,8 +36,6 @@ class Function(Symbol):
     """
     def __init__(self, id, type="fun"):
         super().__init__(id, type)
-        self.params: List[Variable] = []
-
 
 class Class(Symbol):
     """
@@ -45,7 +43,6 @@ class Class(Symbol):
     """
     def __init__(self, id, type="class", parent=None):
         super().__init__(id, type)
-        self.methods: List[Function] = []
         self.attributes: List[Variable] = []
         self.parent = parent
 
