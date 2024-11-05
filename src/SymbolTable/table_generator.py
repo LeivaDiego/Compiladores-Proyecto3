@@ -353,3 +353,20 @@ class TableGenerator(compiscriptVisitor):
             self.printf("INFO -> This is a wrapper node")
             # Visit the rest of the tree
             self.visitChildren(ctx)
+
+    def visitCall(self, ctx:compiscriptParser.CallContext):
+        self.printf("VISIT -> Call node")
+        
+        # Check if the call is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid call")
+            # Check if we are in a valid assignment context
+            if self.current_variable is not None:
+                # Set the data type of the variable to AnyType 
+                # since we don't know the return type
+                self.printf("INFO -> Setting data type for call")
+                self.current_variable.set_values(AnyType())
+        else:
+            self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)

@@ -1,2 +1,2 @@
-var x = !true;
-var y = -5;
+var x = func(a,b);
+var y = cls.method(args);
