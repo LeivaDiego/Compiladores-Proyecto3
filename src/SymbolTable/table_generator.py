@@ -2,32 +2,27 @@ from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SymbolTable.symbol import Symbol, Variable, Function, Class, Scope
 from tabulate import tabulate
-from typing import List
+from typing import List, Type
 
 class TableGenerator(compiscriptVisitor):
-    """
-    TableGenerator class is a visitor class that generates the symbol table.
-    Each symbol is added to the symbol table with its scope and offset.
+    def __init__(self, logging=False):
+        # Logging flag
+        self.logging = logging
 
-    Args:
-        log (bool): A flag to enable logging
-
-    Attributes:
-        logging (bool): A flag to enable logging
-        symbol_table (List[Symbol]): A list of symbols in the symbol table
-        current_scope (Scope): The current scope
-        scope_stack (List[Scope]): A stack to keep track of active scopes 
-        scope_counter (int): A counter to keep track of scopes indexes
-        offset (int): An offset to keep track of symbols in the symbol table
-    """
-    def __init__(self, log=False):
-        self.logging = log
+        # Scoping variables
         self.symbol_table: List[Symbol] = []
         self.current_scope: Scope = None
         self.scope_stack: List[Scope] = []
-        self.scope_counter = -1
-        self.offset = 0
+
+        # Symbol variables
+        self.current_symbol: Symbol = None
+
+        # Helper flags
         self.in_init = False
+        self.in_class = False
+        self.in_function = False
+        self.in_variable = False
+
 
     def printf(self, *args):
         """
@@ -36,151 +31,102 @@ class TableGenerator(compiscriptVisitor):
         if self.logging:
             print(*args)
 
-    def add_symbol(self, symbol: Symbol):
-        """
-        A helper function to add a symbol to the symbol table.
-        Updates the symbol's scope and offset. 
-        Increments the offset by 1.
 
-        Args:
-            symbol (Symbol): A symbol to add to the symbol table
-        """
-        if self.current_scope.id == "init" and symbol.type == "attr":
-            symbol.scope = self.scope_stack[-2]
-        else:
-            symbol.scope = self.current_scope
-        symbol.offset = self.offset
-        self.symbol_table.append(symbol)
-        self.offset += 1
-        self.printf(f"INFO -> Added symbol: ID = {symbol.id}, Type = {symbol.type}, Scope = {symbol.scope.id}, Offset = {symbol.offset}")
-
-    def enter_scope(self, name=None):
-        """
-        A helper function to enter a new scope.
-        Updates the current scope and increments the scope counter.
-        appends the current scope to the scope stack.
-
-        Args:
-            name (str): The name of the scope (default=None)
-        """
-        self.scope_counter += 1
-        self.current_scope = Scope(name, self.scope_counter)
+    def enter_scope(self, name):
+        # Get the index of the current scope
+        scope_index = len(self.scope_stack)
+        # Create a new scope
+        self.current_scope = Scope(name, scope_index)
+        # Append the new scope to the scope stack
         self.scope_stack.append(self.current_scope)
         self.printf(f"INFO -> Entering scope: {self.current_scope.id}")
 
+
     def exit_scope(self):
-        """
-        A helper function to exit the current scope.
-        Updates the current scope to the previous scope in the scope stack.
-        Pops the current scope from the scope stack.
-        """
-        if self.scope_stack:
-            exited_scope = self.scope_stack.pop()
-            self.current_scope = self.scope_stack[-1] if self.scope_stack else 0
-            self.printf(f"INFO -> Exiting: {exited_scope.id}, returning to scope: {self.current_scope.id}")
+        # Pop the current scope from the scope stack
+        exited_scope = self.scope_stack.pop()
+        # Get the new current scope
+        self.current_scope = self.scope_stack[-1]
+        self.printf(f"INFO -> Exiting scope: {exited_scope.id}")
 
-    def display_table(self):
-        """
-        A helper function to display the symbol table in a tabulated format.
-        Writes the symbol table to a file symbol_table.txt.
-        """
-        tabulated_table = []
+    def add_symbol(self, symbol: Symbol):
+        # Determine if the symbol is a variable in a class initialization
+        if isinstance(symbol,(Variable)) and self.in_init:
+            # Variables in init have their scope set to the class scope
+            symbol.scope = self.scope_stack[-2]
+        elif isinstance(symbol, (Function, Class)):
+            # Other symbols use the current scope
+            symbol.scope = self.scope_stack[-2]
+        else:
+            symbol.scope = self.current_scope
 
-        for symbol in self.symbol_table:
-            tabulated_table.append([
-                symbol.id, symbol.type, symbol.scope.id, symbol.scope.index ,symbol.offset
-                ])
-            
-        table_str = tabulate(tabulated_table, 
-                             headers=["ID", "Type", "Scope", "Scope Index", "Offset"],
-                             tablefmt="fancy_grid")
-        
-        with open("src/SymbolTable/symbol_table.txt", "w", encoding="utf-8") as f:
-            f.write(table_str)
+        # Handle specific logic for variables
+        if isinstance(symbol, Variable):
+            # Set the offset and update it in the scope
+            symbol.offset = self.current_scope.offset
+            self.current_scope.offset += symbol.size
 
-        print("SUCCESS -> Symbol Table generated at: src/SymbolTable/symbol_table.txt")
-            
+        # Add the symbol to the symbol table
+        self.symbol_table.append(symbol)
+
+        # Print a message indicating the type of symbol added
+        symbol_type = type(symbol).__name__.lower()
+        self.printf(f"INFO -> Adding {symbol_type}: {symbol.id} to scope: {symbol.scope.id}")
+
+
+    def search_symbol(self, id, type: Type[Symbol]):
+        # Search for the symbol in the symbol table
+        for symbol in reversed(self.symbol_table):
+            if symbol.id == id and isinstance(symbol, type):
+                return symbol
+        return None
 
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
-        self.printf("INFO -> Visiting program")
-        self.enter_scope("global")  # Enter the global scope
+        self.printf("INFO -> Visiting Program")
+        # Enter the global scope
+        self.enter_scope("global")
+        # Visit the rest of the tree
         self.visitChildren(ctx)
 
 
-    def visitVarDecl(self, ctx:compiscriptParser.VarDeclContext):
-        self.printf("INFO -> Visiting variable declaration")
-        id = ctx.IDENTIFIER().getText() # Get the variable identifier
-        var = Variable(id)              # Create a variable symbol
-        self.add_symbol(var)            # Add the variable to the symbol table
-        self.visitChildren(ctx)         # Visit the children of the variable declaration
-
-
-    def visitFunction(self, ctx:compiscriptParser.FunctionContext):
-        self.printf("INFO -> Visiting function")
-        id = ctx.IDENTIFIER().getText() # Get the function identifier
-        func = Function(id)             # Create a function symbol
-        self.add_symbol(func)           # Add the function to the symbol table
-        self.enter_scope(id)            # Enter a new scope with the function name
-        
-        # Check if the function is an init function
-        if id == "init" and self.current_scope.id:
-            self.in_init = True
-        
-        self.visitChildren(ctx)         # Visit the children of the function
-        self.exit_scope()               # Exit the function scope
-
-
-    def visitParameters(self, ctx:compiscriptParser.ParametersContext):
-        self.printf("INFO -> Visiting parameters")
-        for param in ctx.IDENTIFIER():
-            id = param.getText()                # Get the parameter identifier
-            var = Symbol(id, "param")           # Create a param symbol
-            self.add_symbol(var)                # Add the parameter to the symbol table
-
-
-    def visitIfStmt(self, ctx:compiscriptParser.IfStmtContext):
-        self.printf("INFO -> Visiting if statement")
-        self.enter_scope("if block")                # Enter a new scope for the if block
-        self.visitChildren(ctx.statement(0))        # Visit the children of the if statement
-        self.exit_scope()                           # Exit the if block scope
-        if ctx.statement(1):                        # If there is an else statement
-            self.enter_scope("else block")          # Enter a new scope for the else block
-            self.visitChildren(ctx.statement(1))    # Visit the children of the else statement
-            self.exit_scope()                       # Exit the else block scope
-
-
-    def visitForStmt(self, ctx:compiscriptParser.ForStmtContext):
-        self.printf("INFO -> Visiting for statement")
-        self.enter_scope("for block")               # Enter a new scope for the for block
-        self.visitChildren(ctx)                     # Visit the children of the for statement
-        self.exit_scope()                           # Exit the for block scope
-
-
-    def visitWhileStmt(self, ctx:compiscriptParser.WhileStmtContext):
-        self.printf("INFO -> Visiting while statement")
-        self.enter_scope("while block")             # Enter a new scope for the while block
-        self.visitChildren(ctx)                     # Visit the children of the while statement
-        self.exit_scope()                           # Exit the while block scope
-
-
     def visitClassDecl(self, ctx:compiscriptParser.ClassDeclContext):
-        self.printf("INFO -> Visiting class declaration")
-        id = ctx.IDENTIFIER(0).getText()            # Get the class identifier
-        cls = Class(id)                             # Create a class symbol
-        self.add_symbol(cls)                        # Add the class to the symbol table
-        self.enter_scope(id)                        # Enter a new scope with the class name
-        self.visitChildren(ctx)                     # Visit the children of the class
-        self.exit_scope()                           # Exit the class scope
+        self.printf("INFO -> Visiting Class Declaration")
+        self.in_class = True
+        class_id = ctx.IDENTIFIER(0).getText()
+        parent_class = None
+
+        # Check if the class inherits from another class
+        if ctx.IDENTIFIER(1):
+            parent_id = ctx.IDENTIFIER(1).getText()
+            parent_class = self.search_symbol(parent_id, Class)
+
+        self.printf(f"INFO -> Creating class: {class_id}")
+        # Create a new class symbol
+        if parent_class is not None:
+            self.printf(f"INFO -> Inheriting from: {parent_class.id}")
+            self.current_symbol = Class(class_id, parent=parent_class)
+            # Get the attributes and methods of the parent class
+            self.current_symbol.get_parent_attributes()
+            self.current_symbol.get_parent_methods()
+        else:
+            self.current_symbol = Class(class_id)
 
 
-    def visitAssignment(self, ctx:compiscriptParser.AssignmentContext):
-        self.printf("INFO -> Visiting assignment")
-        assignment_str = ctx.getText()              # Get the assignment string
-        # Check if the assignment is an attribute assignment in the init function
-        if self.in_init: 
-            # Check if the assignment is an attribute assignment and not a attribute reference
-            if "this." in assignment_str and "=" in assignment_str:
-                id = assignment_str.split("=")[0].split("this.")[1] # Get the attribute name
-                attr = Symbol(id, "attr")                           # Create an attribute symbol
-                self.add_symbol(attr)                               # Add the attribute to the symbol table
-                self.visitChildren(ctx)                       # Visit the children of the assignment
+        # Enter the class scope
+        self.enter_scope(class_id)
+
+        # Visit the rest of the tree
+        self.visitChildren(ctx)
+
+        # Set the size of the class
+        self.current_symbol.set_size()
+
+        # Add the class to the symbol table
+        self.add_symbol(self.current_symbol)
+
+        # Exit the class scope
+        self.exit_scope()
+
+        # Reset the current symbol and class flag
+        self.current_symbol = None
+        self.in_class = False
