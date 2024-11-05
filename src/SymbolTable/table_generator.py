@@ -14,9 +14,6 @@ class TableGenerator(compiscriptVisitor):
         self.current_scope: Scope = None
         self.scope_stack: List[Scope] = []
 
-        # Symbol variables
-        self.current_symbol: Symbol = None
-
         # Helper flags
         self.in_init = False
         self.in_class = False
@@ -48,6 +45,7 @@ class TableGenerator(compiscriptVisitor):
         # Get the new current scope
         self.current_scope = self.scope_stack[-1]
         self.printf(f"INFO -> Exiting scope: {exited_scope.id}")
+
 
     def add_symbol(self, symbol: Symbol):
         # Determine if the symbol is a variable in a class initialization
@@ -91,12 +89,16 @@ class TableGenerator(compiscriptVisitor):
 
     def visitClassDecl(self, ctx:compiscriptParser.ClassDeclContext):
         self.printf("INFO -> Visiting Class Declaration")
+        # Set the class flag
         self.in_class = True
+
+        # Get the class id
         class_id = ctx.IDENTIFIER(0).getText()
         parent_class = None
 
         # Check if the class inherits from another class
         if ctx.IDENTIFIER(1):
+            # Get the parent class
             parent_id = ctx.IDENTIFIER(1).getText()
             parent_class = self.search_symbol(parent_id, Class)
 
@@ -104,13 +106,12 @@ class TableGenerator(compiscriptVisitor):
         # Create a new class symbol
         if parent_class is not None:
             self.printf(f"INFO -> Inheriting from: {parent_class.id}")
-            self.current_symbol = Class(class_id, parent=parent_class)
+            new_class = Class(class_id, parent=parent_class)
             # Get the attributes and methods of the parent class
-            self.current_symbol.get_parent_attributes()
-            self.current_symbol.get_parent_methods()
+            new_class.get_parent_attributes()
+            new_class.get_parent_methods()
         else:
-            self.current_symbol = Class(class_id)
-
+            new_class = Class(class_id)
 
         # Enter the class scope
         self.enter_scope(class_id)
@@ -119,14 +120,50 @@ class TableGenerator(compiscriptVisitor):
         self.visitChildren(ctx)
 
         # Set the size of the class
-        self.current_symbol.set_size()
+        new_class.set_size()
 
         # Add the class to the symbol table
-        self.add_symbol(self.current_symbol)
+        self.add_symbol(new_class)
 
         # Exit the class scope
         self.exit_scope()
 
-        # Reset the current symbol and class flag
-        self.current_symbol = None
+        # Reset the class flag
         self.in_class = False
+
+
+    def visitFunction(self, ctx:compiscriptParser.FunctionContext):
+        self.printf("INFO -> Visiting Function Declaration")
+        # Set the function flag
+        self.in_function = True
+
+        # Get the function id
+        function_id = ctx.IDENTIFIER().getText()
+        self.printf(f"INFO -> Creating function: {function_id}")
+        
+        # Check if the function is a constructor
+        if function_id == "init" and self.in_class:
+            self.printf(f"INFO -> This function is a Constructor for class: {self.current_scope.id}")
+            self.in_init = True
+
+        # Create a new function symbol
+        new_function = Function(function_id)
+
+        # Enter the function scope
+        self.enter_scope(function_id)
+
+        # Visit the rest of the tree
+        self.visitChildren(ctx)
+
+        # Add the function to the class methods if in a class
+        if self.in_class:
+            self.current_scope.parent.methods.append(new_function)
+            
+        # Add the function to the symbol table
+        self.add_symbol(new_function)
+
+        # Exit the function scope
+        self.exit_scope()
+
+        # Reset the function flag
+        self.in_function = False
