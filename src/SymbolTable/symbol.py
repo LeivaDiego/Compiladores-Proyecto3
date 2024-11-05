@@ -1,5 +1,5 @@
 from typing import List
-from SymbolTable.types import DataType
+from SymbolTable.types import DataType, StringType, NumberType, AnyType
 
 class Symbol():
     """
@@ -21,6 +21,7 @@ class Variable(Symbol):
     def __init__(self, id, type="var"):
         super().__init__(id, type)
         self.data_type = None
+        self.expr_terms: List[ExprTerm]= []
 
     def set_values(self, data_type: DataType):
         """
@@ -29,6 +30,17 @@ class Variable(Symbol):
         self.data_type = data_type
         self.size = data_type.size
 
+    def resolve_expr_type(self):
+        if any(term.data_type.name == "str" for term in self.expr_terms):
+            self.set_values(StringType())
+        elif any(term.data_type.name == "num" for term in self.expr_terms):
+            self.set_values(NumberType())
+        elif any(term.data_type.name == "any" for term in self.expr_terms):
+            self.set_values(AnyType())
+        else:
+            raise Exception("Error: Invalid type in expression")
+       
+
 
 class Function(Symbol):
     """
@@ -36,6 +48,7 @@ class Function(Symbol):
     """
     def __init__(self, id, type="fun"):
         super().__init__(id, type)
+
 
 class Class(Symbol):
     """
@@ -63,6 +76,7 @@ class Class(Symbol):
             size += attr.data_type.size
         self.size = size
 
+
 class Scope():
     """
     Scope class represents a scope in the symbol table
@@ -71,3 +85,8 @@ class Scope():
         self.id = id
         self.index = index
         self.offset = 0
+
+
+class ExprTerm():
+    def __init__(self, data_type: DataType):
+        self.data_type = data_type

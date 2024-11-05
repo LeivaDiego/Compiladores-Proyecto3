@@ -1,2 +1,9 @@
-var x = func(a,b);
-var y = cls.method(args);
+var arg1 = 3.14;
+var arg2 = 12;
+var x = 1;
+var z = true;
+var a = "Hello World";
+var b = nil;
+var c = x;
+var d = x + 3;
+var e = (a + b);
