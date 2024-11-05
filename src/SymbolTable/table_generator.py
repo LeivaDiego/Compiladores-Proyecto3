@@ -285,3 +285,26 @@ class TableGenerator(compiscriptVisitor):
             self.printf("INFO -> This is a wrapper node")
             # Visit the rest of the tree
             self.visitChildren(ctx)
+
+
+    def visitTerm(self, ctx:compiscriptParser.TermContext):
+        self.printf("VISIT -> Term node")
+        
+        # Check if the term is not a wrapper node
+        if ctx.getChildCount() > 1:
+            self.printf("INFO -> This is a valid term")
+            # Check if we are in a valid assignment context
+            if self.current_variable is not None:
+                # Set the data type of the variable
+                nodes = ctx.getChildren()
+                for node in nodes:
+                    if node.getText() == "-":
+                        self.printf("INFO -> Found - operator, Setting data type for term")
+                        self.current_variable.set_values(NumberType())
+                        return
+                    elif node.getText() == "+":
+                        self.printf("INFO -> Found + operator need to check if it is a string concatenation")
+        else:
+            self.printf("INFO -> This is a wrapper node")
+            # Visit the rest of the tree
+            self.visitChildren(ctx)
