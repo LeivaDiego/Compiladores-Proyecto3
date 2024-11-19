@@ -90,10 +90,11 @@ class SemanticAnalyzer(compiscriptVisitor):
             var_id = ctx.IDENTIFIER().getText()
             # Check if the assignment is for a class attribute
             if ctx.call():
+                self.log(f"INFO -> Assignment for a class attr {var_id}")
                 # TODO: Get the class attribute id
                 self.visitCall(ctx.call())
                 # TODO: check for the class attribute in the instance
-                self.log(f"INFO -> Assignment for a class attr")
+                
 
             else:
                 # The assignment is for a variable
@@ -117,7 +118,10 @@ class SemanticAnalyzer(compiscriptVisitor):
         if ctx.getChildCount() > 1:
             logic_ands = []
             # TODO: Get the logic_and nodes and visit them
-            self.log(f"INFO -> Logic_or node: {ctx.getText()}")
+            for logic_and in ctx.logic_and():
+                self.log(f"INFO -> logic_and node: {logic_and.getText()}")
+                self.visitLogic_and(logic_and)
+            
 
         else:
             # The logic_or is a wrapper node, skip it
@@ -133,7 +137,10 @@ class SemanticAnalyzer(compiscriptVisitor):
         if ctx.getChildCount() > 1:
             equalities = []
             # TODO: Get the equality nodes and visit them
-            self.log(f"INFO -> Logic_and node: {ctx.getText()}")
+            for equality in ctx.equality():
+                self.log(f"INFO -> equality node: {equality.getText()}")
+                self.visitEquality(equality)
+                
             
         else:
             # The logic_and is a wrapper node, skip it
@@ -149,7 +156,9 @@ class SemanticAnalyzer(compiscriptVisitor):
         if ctx.getChildCount() > 1:
             comparisons = []
             # TODO: Get the comparison nodes and visit them
-            self.log(f"INFO -> Equality node: {ctx.getText()}")
+            for comparison in ctx.comparison():
+                self.log(f"INFO -> Comparison node: {comparison.getText()}")
+                self.visitComparison(comparison)
 
         else:
             # The equality is a wrapper node, skip it
@@ -167,8 +176,8 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Get the term nodes
             for term in ctx.term():
                 # TODO: visit the term node and get type
+                self.log(f"INFO -> Term node: {term.getText()}")
                 self.visitTerm(term)
-                self.log(f"INFO -> Term node: {term}")
 
         else:
             # The comparison is a wrapper node, skip it
@@ -186,9 +195,9 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Get the factor nodes
             for factor in ctx.factor():
                 # TODO: visit the factor node and get type
+                self.log(f"INFO -> Factor node: {factor.getText()}")
                 self.visitFactor(factor)
-                self.log(f"INFO -> Factor node: {factor}")
-
+                
         else:
             # The term is a wrapper node, skip it
             # and visit the factor node
@@ -204,8 +213,8 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Get the unary nodes
             for unary in ctx.unary():
                 # TODO: visit the unary node and get type
+                self.log(f"INFO -> Unary node: {unary.getText()}")
                 self.visitUnary(unary)
-                self.log(f"INFO -> Unary node: {unary}")
 
         else:
             # The factor is a wrapper node, skip it
@@ -243,16 +252,22 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the call isn't a wrapper node
         if ctx.getChildCount() > 1:
+            
             # Check if the call is a function call
-            if ctx.arguments():
-                # TODO: Get the function arguments
-                self.visitArguments(ctx.arguments())
+            if ctx.getChild(1).getText() == "(":
+                # TODO: Get the function identifier
+                self.visitPrimary(ctx.primary())
 
-            # Check if theres an identifier (idk why...)
-            elif ctx.IDENTIFIER():
-                # Get the identifier
-                identifier = ctx.IDENTIFIER().getText()
-                # TODO: maybe search for the identifier...
+                # Check if the function call has arguments
+                if ctx.arguments():
+                    # TODO: Get the function arguments
+                    self.visitArguments(ctx.arguments(0))
+
+            # Check if the call is a class attribute call
+            elif ctx.getChild(1).getText() == ".":
+                # Get the attribute identifier
+                attribute = ctx.IDENTIFIER(0).getText()
+                self.log(f"INFO -> Attribute: {attribute}")
 
         else:
             # The call is a wrapper node, skip it
@@ -298,6 +313,10 @@ class SemanticAnalyzer(compiscriptVisitor):
                 identifier = ctx.IDENTIFIER().getText()
                 self.log(f"INFO -> Identifier: {identifier}")
 
+            # Check if the primary is a this keyword
+            elif primary_str == "this":
+                self.log(f"INFO -> this keyword")
+
             # Check if the primary is a instantiation
             elif ctx.instantiation():
                 self.visitInstantiation(ctx.instantiation())
@@ -328,8 +347,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
     def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):
         self.log("VISIT -> Arguments node")
-        # Visit each expression in the arguments
+        # Get the expression nodes
         for expression in ctx.expression():
+            # Visit the expression node
             self.visitExpression(expression)
-            # TODO: check for the type of the expression node
-            self.log(f"INFO -> Argument: {expression.getText()}")
