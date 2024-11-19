@@ -6,12 +6,7 @@ class Persona {
   }
 
   saludar() {
-    print "Hola, mi nombre es " + this.nombre;
-  }
-
-  incrementarEdad(anos) {
-    this.edad = this.edad + anos;
-    print "Ahora tengo " + this.edad + " anos.";
+    print "Hola, mi nombre es " + this.color;
   }
 }
 
@@ -24,46 +19,14 @@ class Estudiante extends Persona {
   estudiar() {
     print this.nombre + " esta estudiando en " + this.grado + " grado.";
   }
-
-  promedioNotas(nota1, nota2, nota3) {
-    var promedio = (nota1 + nota2 + nota3) / 3;
-    print "El promedio de " + this.nombre + " es " + promedio;
-  }
-}
-
-fun fibonacci(n) {
-  if (n <= 1) {
-    return n;
-  } else {
-    var a = fibonacci(n - 1);
-    var b = fibonacci(n - 2);
-    return a + b;
-  }
-}
-
-fun ackermann(m, n) {
-  if (m == 0) {
-    return n + 1;
-  } else if (m > 0 and n == 0) {
-    return ackermann(m - 1, 1);
-  } else if (m > 0 and n > 0) {
-    return ackermann(m - 1, ackermann(m, n - 1));
-  }
-}
-
-fun factorial(n) {
-  if (n <= 1) {
-    return 1;
-  } else {
-    return n * factorial(n - 1);
-  }
 }
 
 var nombre = "Erick";
 
+var ropero = new Persona(nombre, 20);
 var juan = new Estudiante(nombre, 20, 3);
-juan.saludar();    // Salida: Hola, mi nombre es Erick
-juan.incrementarEdad(5);
+juan.saludar();    // Salida: Hola, mi nombre es Juan
+juan.estudiar();   // Salida: Juan esta estudiando en 3 grado
 
 for (var i = 1; i <= 5; i = i + 1) {
   if (i % 2 == 0) {
@@ -73,22 +36,7 @@ for (var i = 1; i <= 5; i = i + 1) {
   }
 }
 
-// Expresion aritmetica
-var resultado = (juan.edad * 2) + (5 - 3) / 2;
-print "Resultado de la expresion: " + resultado;
-
-// Testing the Ackermann function
-var m = 2;
-var n = 3;
-var result = ackermann(m, n);
-print "Ackermann(" + m + ", " + n + ") = " + result;
-
-// Testing the fibonacci
-var numero = 10;
-var resultado = fibonacci(numero);
-print "El termino " + numero + " de la serie de Fibonacci es: " + resultado;
-
-// Testing the factorial
-var numero = getInput();
-var resultado = factorial(numero);
-print "El factorial de " + numero + " es: " + resultado;
+while (juan.edad < 25) {
+  juan.edad = juan.edad + 1;
+  print "Edad de Juan: " + juan.edad;
+}

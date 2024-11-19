@@ -56,6 +56,19 @@ class Class(Symbol):
         """
         if self.parent:
             self.attributes += self.parent.attributes
+
+
+    def get_parent_methods(self):
+        """
+        Get the methods of the parent class
+        """
+        if self.parent:
+            # Add the parent methods to the child class
+            # but only if the method is not already defined in the child class
+            for method in self.parent.methods:
+                if method.id not in [m.id for m in self.methods]:
+                    self.methods.append(method)
+                    
     
     def set_size(self):
         """
