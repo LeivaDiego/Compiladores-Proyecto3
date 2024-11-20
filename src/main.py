@@ -4,7 +4,7 @@ from antlr4 import FileStream, CommonTokenStream
 from ParseTree.parse_tree import TreeVisualizer
 from antlr4.error.ErrorStrategy import DefaultErrorStrategy, ParseCancellationException
 from Utils.custom_exception import ThrowingErrorListener
-from SymbolTable.table_generator import TableGenerator
+from SemanticAnalyzer.semantic_analyzer import SemanticAnalyzer
 
 
 def main():
@@ -36,10 +36,10 @@ def main():
                            format='png', 
                            output_dir='src/ParseTree/Output')
     
-    # Create a symbol table generator and visit the parse tree
-    table_generator = TableGenerator(logging=True)
-    table_generator.visit(parse_tree)
-    table_generator.display_table()
+    # Create a semantic analyzer and visit the parse tree
+    semantic_analyzer = SemanticAnalyzer(logging=True)
+    semantic_analyzer.visit(parse_tree)
+    semantic_analyzer.display_table()
 
 
 if __name__ == '__main__':
