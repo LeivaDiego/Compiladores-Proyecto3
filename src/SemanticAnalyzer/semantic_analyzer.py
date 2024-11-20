@@ -1,8 +1,8 @@
 from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SemanticAnalyzer.symbols import Symbol, Variable, Function, Class, Scope
-from SemanticAnalyzer.types import DataType, StringType, BooleanType, NumberType, NilType, AnyType, InstanceType
-
+from SemanticAnalyzer.types import StringType, BooleanType, NumberType, NilType, AnyType, InstanceType
+from tabulate import tabulate
 
 class SemanticAnalyzer(compiscriptVisitor):
     def __init__(self, logging=False):
@@ -32,6 +32,37 @@ class SemanticAnalyzer(compiscriptVisitor):
     def log(self, message):
         if self.logging:
             print(f"    {message}")
+
+    def display_table(self):
+        print("Generating symbol table...")
+        formatted_symbols = []
+
+        # Table headers
+        headers = ["ID", "Type", "Scope", "Scope Index", "Data Type", "Size", "Offset"]
+
+        # format the symbols for display
+        self.log("INFO -> Formatting symbols for display")
+        for symbol in self.symbol_table:
+            symbol_data = [
+                symbol.id,
+                symbol.type,
+                symbol.scope.id,
+                symbol.scope.index,
+                symbol.data_type.name if symbol.data_type is not None else "-",
+                symbol.size if symbol.size is not None else "-",
+                symbol.offset if symbol.offset is not None else "-"
+            ]
+            # Append the formatted symbol to the list
+            formatted_symbols.append(symbol_data)
+
+        # Create a table with the formatted symbols and headers
+        # using the tabulate library
+        display_table = tabulate(formatted_symbols, headers, tablefmt="fancy_grid")
+
+        with open("src/SemanticAnalyzer/symbol_table.txt", "w", encoding="utf8") as f:
+            f.write(display_table)
+
+        print("SUCCESS -> Symbol table has been written to src/SymbolTable/symbol_table.txt")
 
 
     def enter_scope(self, id):
@@ -102,6 +133,7 @@ class SemanticAnalyzer(compiscriptVisitor):
         self.enter_scope("global")
         # visit the children of the program node
         self.visitChildren(ctx)
+        print("SUCCESS -> Semantic Analysis completed\n")
 
 
     def visitDeclaration(self, ctx:compiscriptParser.DeclarationContext):
@@ -220,6 +252,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Reset the current function
         self.current_function = None
+        self.in_init = False
 
 
     def visitBlock(self, ctx:compiscriptParser.BlockContext):
@@ -327,7 +360,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             
             # Check if all the logic_and nodes are boolean type
             for logic_and in logic_ands:
-                if not isinstance(logic_and, BooleanType):
+                if not isinstance(logic_and, BooleanType) and not isinstance(logic_and, AnyType):
                     raise Exception(f"Invalid type for logic_or node got: {logic_and.name}, expected: bool")
             
             # The logic_or is a boolean type
@@ -351,7 +384,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                 equalities.append(self.visitEquality(equality))
             # check if all the equality nodes are boolean type
             for equality in equalities:
-                if not isinstance(equality, BooleanType):
+                if not isinstance(equality, BooleanType) and not isinstance(equality, AnyType):
                     raise Exception(f"Invalid type for logic_and node got: {equality.name}, expected: bool")
                 
             # The logic_and is a boolean type
@@ -376,7 +409,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Check if all the comparison nodes are of the same type
             # all comparisons must be of the same type
             for comparison in comparisons:
-                if not isinstance(comparison, comparisons[0].__class__):
+                if not isinstance(comparison, comparisons[0].__class__) and not isinstance(comparison, AnyType):
                     raise Exception(f"Invalid type for equality node got: {comparison.name}, expected: {comparisons[0].name}")
                 
             # The equality is a boolean type
@@ -402,7 +435,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
             # Check if all the term nodes are of number type
             for term in terms:
-                if not isinstance(term, NumberType):
+                if not isinstance(term, NumberType) and not isinstance(term, AnyType):
                     raise Exception(f"Invalid type for comparison node got: {term.name}, expected: num")
                 
             # The comparison is a boolean type
@@ -447,7 +480,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                     raise Exception(f"Invalid operator - in print statement")
 
                 for factor in factors:
-                    if not isinstance(factor, NumberType):
+                    if not isinstance(factor, NumberType) and not isinstance(factor, AnyType):
                         raise Exception(f"Invalid type for term node got: {factor.name}, expected: num")
                     
                 # The term is a number type
@@ -482,7 +515,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
             # Check if all the unary nodes are of number type
             for unary in unaries:
-                if not isinstance(unary, NumberType):
+                if not isinstance(unary, NumberType) and not isinstance(unary, AnyType):
                     raise Exception(f"Invalid type for factor node got: {unary.name}, expected: num")
                 
             # The factor is a number type
@@ -510,7 +543,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                 if negation == "!":
                     self.log(f"INFO -> Negation operator: {negation}")
                     # Check if the unary type is a boolean
-                    if not isinstance(unray_type, BooleanType):
+                    if not isinstance(unray_type, BooleanType) and not isinstance(unray_type, AnyType):
                         raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type.name}, expected: bool")
                     
                     # The unary is a boolean type
@@ -519,7 +552,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                 elif negation == "-":
                     self.log(f"INFO -> Negation operator: {negation}")
                     # Check if the unary type is a number
-                    if not isinstance(unray_type, NumberType):
+                    if not isinstance(unray_type, NumberType) and not isinstance(unray_type, AnyType):
                         raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type.name}, expected: num")
                     
                     # The unary is a number type
@@ -544,7 +577,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             
             self.visitPrimary(ctx.primary())
 
-            # Check if the call is a function call
+            # Check if the call is a plain function call
             if ctx.getChild(1).getText() == "(":
 
                 # Check if the function call has arguments
@@ -557,24 +590,44 @@ class SemanticAnalyzer(compiscriptVisitor):
                 attribute = ctx.IDENTIFIER(0).getText()
                 self.log(f"INFO -> Attribute: {attribute}")
 
-                # Search for the attribute in the symbol table
+                # Check if the call is inside a class
                 if self.in_class_assignment:
+                    # Search for the attribute in the current class
                     symbol = self.current_class.search_attribute(attribute)
                     if symbol is None:
-                        raise Exception(f"Attribute {attribute} not found in class {self.current_class.id}")
+                        # If the attribute is not found in the current class
+                        # Try searching for a method
+                        symbol = self.current_class.search_method(attribute)
+                        if symbol is None:
+                            raise Exception(f"Attribute {attribute} not found in class {self.current_class.id}")
                 
                     return symbol.data_type
+                
+                # Check if the call is a class method call and outside a class
+                elif ctx.getChild(3):
+                    # Get the method identifier
+                    method = ctx.IDENTIFIER(0).getText()
+                    self.log(f"INFO -> Method: {method}")
+
+                    # Search for the method in the symbol table
+                    for symbol in self.symbol_table:
+                        # Check if the symbol exists in the symbol table
+                        if symbol.id == method and isinstance(symbol, Function):
+                            return symbol.return_type
+                        
+                    # At this point the method is not found in the symbol table
+                    raise Exception(f"Method {method} not found in symbol table")
+            
                 else:
                     # We are outside of a class, search for the attribute in the symbol table
-                    symbol = self.search_symbol(attribute, Variable)
-                    if symbol is None:
-                        # Check if the attribute is a method
-                        symbol = self.search_symbol(attribute, Function)
-                        if symbol is None:
-                            raise Exception(f"Class attribute {attribute} not found in symbol table")
-                    
-                    return symbol.data_type
-
+                    for symbol in self.symbol_table:
+                        # Check if the symbol exists in the symbol table
+                        if symbol.id == attribute and isinstance(symbol, Variable):
+                            return symbol.data_type
+                        
+                    # At this point the attribute is not found in the symbol table
+                    raise Exception(f"Attribute {attribute} not found in symbol table")
+                
         else:
             # The call is a wrapper node, skip it
             # and visit the primary node

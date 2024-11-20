@@ -98,6 +98,17 @@ class Class(Symbol):
         if self.parent:
             return self.parent.search_attribute(id)
         return None
+    
+    def search_method(self, id):
+        """
+        Search for a method in the class and its parents
+        """
+        for method in self.methods:
+            if method.id == id:
+                return method
+        if self.parent:
+            return self.parent.search_method(id)
+        return None
 
     def __str__(self):
         return f"{self.type}: {self.id} | size: {self.size} | scope: {self.scope.id}"

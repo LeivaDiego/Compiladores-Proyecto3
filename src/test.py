@@ -38,6 +38,7 @@ def main():
     # Create a semantic analyzer and visit the parse tree
     semantic_analyzer = SemanticAnalyzer(logging=True)
     semantic_analyzer.visit(parse_tree)
+    semantic_analyzer.display_table()
 
 
 
