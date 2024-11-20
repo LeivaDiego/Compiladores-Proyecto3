@@ -17,6 +17,7 @@ class TreeVisualizer:
         - render: Renders the graph to a file in the specified format and directory.
     """
     def __init__(self, file_path):
+        print("Generating Parse Tree...")
         self.graph = Digraph(comment='Parse Tree')
         self.node_count = 0
         self.name = self.generate_name(file_path)
@@ -105,7 +106,7 @@ class TreeVisualizer:
         # Render the graph to the specified format and path
         self.graph.render(filename=output_path, format=format, cleanup=cleanup)
 
-        print(f"SUCCESS -> Parse tree generated at: {output_path}.{format}")
+        print(f"SUCCESS -> Parse tree generated at: {output_path}.{format}\n")
 
     
     def generate_name(self, path):
