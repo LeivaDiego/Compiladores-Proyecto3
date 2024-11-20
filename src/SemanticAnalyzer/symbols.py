@@ -1,4 +1,4 @@
-from SemanticAnalyzer.types import DataType
+from SemanticAnalyzer.types import DataType, NilType
 
 class Symbol():
     """
@@ -6,7 +6,7 @@ class Symbol():
     """
     def __init__(self, id, type):
         self.id = id                        # The name of the symbol
-        self.type: DataType = type          # The type of the symbol (var, fun, class, param, etc.)
+        self.type = type                    # The type of the symbol (var, fun, class, param, etc.)
         self.scope: Scope = None            # The scope the symbol is in
         self.offset = None                  # The offset of the symbol in the memory
         self.size = None                    # The size of the symbol in the memory (for variables and classes)
@@ -23,8 +23,15 @@ class Variable(Symbol):
     def __init__(self, id, type="var"):
         super().__init__(id, type)
 
+    def set_type(self, data_type: DataType):
+        """
+        Set the data type of the variable
+        """
+        self.data_type = data_type
+        self.size = data_type.size
+
     def __str__(self):
-        return f"{self.type}: {self.id} | type: {self.data_type.name} | size: {self.size}: scope: {self.scope.id} | offset: {self.offset}"
+        return f"{self.type}: {self.id} | type: {self.data_type} | size: {self.size} | scope: {self.scope.id} | offset: {self.offset}"
 
 
 class Function(Symbol):
@@ -34,9 +41,11 @@ class Function(Symbol):
     def __init__(self, id, type="fun"):
         super().__init__(id, type)
         self.parameters = []
+        self.returns: list[DataType] = []      # The return types of the function
+        self.return_type = NilType()           # The return type of the function
 
     def __str__(self):
-        return f"{self.type}: {self.id} | return type: {self.return_type.name} | scope: {self.scope.id}"
+        return f"{self.type}: {self.id} | return type: {self.return_type} | scope: {self.scope.id}"
 
 
 class Class(Symbol):
@@ -68,7 +77,7 @@ class Class(Symbol):
             for method in self.parent.methods:
                 if method.id not in [m.id for m in self.methods]:
                     self.methods.append(method)
-                    
+
     
     def set_size(self):
         """
@@ -78,6 +87,17 @@ class Class(Symbol):
         for attr in self.attributes:
             size += attr.data_type.size
         self.size = size
+
+    def search_attribute(self, id):
+        """
+        Search for an attribute in the class and its parents
+        """
+        for attr in self.attributes:
+            if attr.id == id:
+                return attr
+        if self.parent:
+            return self.parent.search_attribute(id)
+        return None
 
     def __str__(self):
         return f"{self.type}: {self.id} | size: {self.size} | scope: {self.scope.id}"
@@ -93,4 +113,3 @@ class Scope():
         self.id = id
         self.index = index
         self.offset = 0
-        self.symbol_table: list[Symbol] = [] # The symbol table of the scope

@@ -6,9 +6,9 @@ class DataType():
     def __str__(self):
         return self.name
 
-class InstanceType():
-    def __init__(self, name="instance"):
-        self.name = name
+class InstanceType(DataType):
+    def __init__(self, name="instance", size=0):
+        super().__init__(name, size)
         
 class AnyType(DataType):
     def __init__(self, name="any", size=10):

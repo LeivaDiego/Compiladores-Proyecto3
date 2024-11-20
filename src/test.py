@@ -1,6 +1,6 @@
 from CompiScript.compiscriptLexer import compiscriptLexer
 from CompiScript.compiscriptParser import compiscriptParser
-from antlr4 import FileStream, CommonTokenStream
+from antlr4 import FileStream, CommonTokenStream 
 from ParseTree.parse_tree import TreeVisualizer
 from antlr4.error.ErrorStrategy import DefaultErrorStrategy, ParseCancellationException
 from Utils.custom_exception import ThrowingErrorListener

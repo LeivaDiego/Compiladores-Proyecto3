@@ -1,24 +1,33 @@
 from CompiScript.compiscriptVisitor import compiscriptVisitor
 from CompiScript.compiscriptParser import compiscriptParser
 from SemanticAnalyzer.symbols import Symbol, Variable, Function, Class, Scope
-from SemanticAnalyzer.types import DataType, StringType, BooleanType, NumberType, NilType, AnyType
+from SemanticAnalyzer.types import DataType, StringType, BooleanType, NumberType, NilType, AnyType, InstanceType
 
 
 class SemanticAnalyzer(compiscriptVisitor):
     def __init__(self, logging=False):
         self.logging = logging # Flag to enable logging
         print("Starting Semantic Analysis...")
+        
         # Scoping and symbol table
         self.current_scope: Scope = None        # The current scope
         self.scope_stack: list[Scope] = []      # The scope stack
-        self.symbol_table = []                  # The symbol table
+        self.symbol_table: list[Symbol] = []    # The symbol table
 
         # Symbol helpers
         self.current_variable: Variable = None  # The current variable
         self.current_function: Function = None  # The current function
-        self.class_stack: list[Class] = []      # The class stack (for nested classes)
         self.current_class: Class = None        # The current class
 
+        # Scope counters 
+        self.for_qty = 0                        # The quantity of for loops
+        self.while_qty = 0                      # The quantity of while loops
+        self.if_qty = 0                         # The quantity of if statements
+        self.else_qty = 0                       # The quantity of else statements
+
+        # Helper flags
+        self.in_init = False                    # Flag to check if we are in a class initializer
+        self.in_class_assignment = False              # Flag to check if we are in an assignment
 
     def log(self, message):
         if self.logging:
@@ -49,15 +58,42 @@ class SemanticAnalyzer(compiscriptVisitor):
         if isinstance(symbol, Variable) and symbol.type == "attr":
             # If it is, set the scope to the current class
             # instead of the current scope
-            symbol.scope = self.current_class.scope
+            symbol.scope = self.scope_stack[-2]
+            symbol.offset = symbol.scope.offset
+            self.scope_stack[-2].offset += symbol.size
+
+        elif isinstance(symbol, Variable):
+            # If the symbol is a variable, set the scope to the current scope
+            symbol.scope = self.current_scope
+            symbol.offset = self.current_scope.offset
+            self.current_scope.offset += symbol.size
+
         else:
-            # Otherwise, set the scope to the current scope
+            # If the symbol is not a variable, nor an attribute 
+            # set the scope to the current scope and leave the offset as is
             symbol.scope = self.current_scope
 
         # Add the symbol to the symbol table
         self.symbol_table.append(symbol)
+
         # Log the symbol addition
         self.log(f"ADDED SYMBOL -> {symbol}")
+
+
+    def search_symbol(self, id, type: Symbol):
+        # Search for the symbol in the symbol table
+        # starting from the current scope and going up 
+        # the scope stack
+        valid_scopes = set(self.scope_stack)    # The valid scopes to search
+
+        # Iterate over the symbol table in reverse order
+        for symbol in reversed(self.symbol_table):
+            # Check if the symbol is in the valid scopes and has the correct type
+            if symbol.id == id and symbol.scope in valid_scopes and isinstance(symbol, type):
+                return symbol
+            
+        # If the symbol is not found return None
+        return None
 
 
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
@@ -98,6 +134,7 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Get the class identifier
         class_id = ctx.IDENTIFIER(0).getText()
         parent_class = None # The parent class if exists
+        self.in_class_assignment = True
 
         self.log(f"INFO -> Class declaration for: {class_id}")
 
@@ -106,17 +143,20 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Get the parent class identifier
             parent_id = ctx.IDENTIFIER(1).getText()
             self.log(f"INFO -> Inherits from class: {parent_id}")
-            # TODO: search for the class in the symbol table
+            parent_class = self.search_symbol(parent_id, Class)
 
         # Create a new class symbol
         if parent_class is not None:
-            # TODO: create a new class symbol with parent attributes and methods
             self.log(f"INFO -> Creating class symbol with parent attributes and methods")
+            self.current_class = Class(class_id, parent=parent_class)
+            # Get the parent attributes and methods
+            self.current_class.get_parent_attributes()
+            self.current_class.get_parent_methods()
+
         else:
             # The class is standalone without a parent
             self.log(f"INFO -> Creating standalone class symbol")
-            # TODO: create a new class symbol without parent attributes and methods
-
+            self.current_class = Class(class_id)
 
         # Enter the class scope
         self.enter_scope(class_id)
@@ -126,14 +166,19 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Visit each function in the class body
             self.log(f"INFO -> Visiting function in class body")
             self.visitFunction(function)
-            # TODO: visit the function node and add it to the symbol table
 
-        # TODO: after visiting all the functions, set the size of the class
+        # Set the size of the class based on the size of its attributes
+        self.current_class.set_size()
 
         # Exit the class scope
         self.exit_scope()
 
-        # TODO: add the class symbol to the symbol table
+        # Add the class symbol to the symbol table
+        self.add_symbol(self.current_class)
+
+        # Reset the current class
+        self.current_class = None
+        self.in_class_assignment = False
 
 
     def visitFunDecl(self, ctx:compiscriptParser.FunDeclContext):
@@ -141,11 +186,20 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Visit the function node
         self.visitFunction(ctx.function())
 
+
     def visitFunction(self, ctx:compiscriptParser.FunctionContext):
         self.log("VISIT -> Function node")
         # Get the function identifier
         fun_id = ctx.IDENTIFIER().getText()
-        self.log(f"INFO -> Function declaration for: {fun_id}")
+        self.log(f"INFO -> Creating function: {fun_id}")
+
+        # Check if the function is a constructor
+        if fun_id == "init" and self.current_class is not None:
+            self.log(f"INFO -> This function is a constructor for class: {self.current_class.id}")
+            self.in_init = True
+
+        # Create a new function symbol
+        self.current_function = Function(fun_id)
 
         # Enter the function scope
         self.enter_scope(fun_id)
@@ -161,7 +215,12 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Exit the function scope
         self.exit_scope()
 
-        # TODO: create a new function symbol
+        # Add the function symbol to the symbol table
+        self.add_symbol(self.current_function)
+
+        # Reset the current function
+        self.current_function = None
+
 
     def visitBlock(self, ctx:compiscriptParser.BlockContext):
         self.log("VISIT -> Block node")
@@ -177,15 +236,25 @@ class SemanticAnalyzer(compiscriptVisitor):
         var_id = ctx.IDENTIFIER().getText()
         self.log(f"INFO -> Variable declaration for: {var_id}")
 
+        # Create a new variable symbol
+        self.current_variable = Variable(var_id)
+
         # Check if the variable has an assignment
         if ctx.expression():
             # Visit the expression node
-            self.visitExpression(ctx.expression())
-            #TODO: assign the type of the expression to the variable
+            type = self.visitExpression(ctx.expression())
+            # Set the type of the variable
+            self.current_variable.set_type(type)
+            self.log(f"INFO -> Variable type set to: {type}")
+
         else:
             # If the variable doesn't have an assignment we can't infer the type
             # set the type to any
             self.log(f"INFO -> Variable type set to any")
+            self.current_variable.set_type(AnyType())
+
+        # Add the variable symbol to the symbol table
+        self.add_symbol(self.current_variable)
 
 
     def visitExpression(self, ctx:compiscriptParser.ExpressionContext):
@@ -193,10 +262,10 @@ class SemanticAnalyzer(compiscriptVisitor):
         self.log(f"INFO -> Expression: {ctx.getText()}")
         # Check if the expression is an assignment
         if ctx.assignment():
-            self.visitAssignment(ctx.assignment())
+            return self.visitAssignment(ctx.assignment())
         # Check if the expression is a anonymous function
         elif ctx.funAnon():
-            self.visitFunAnon(ctx.funAnon())
+            return self.visitFunAnon(ctx.funAnon())
         else:
             # The expression is not a valid expression
             raise Exception(f"Invalid expression: {ctx.getText()}")
@@ -204,31 +273,46 @@ class SemanticAnalyzer(compiscriptVisitor):
 
     def visitAssignment(self, ctx:compiscriptParser.AssignmentContext):
         self.log("VISIT -> Assignment node")
+
         # Check if the assignment isn't a wrapper node
         if ctx.getChildCount() > 1:
             # Get the variable id
             var_id = ctx.IDENTIFIER().getText()
-            # Check if the assignment is for a class attribute
-            if ctx.call():
-                self.log(f"INFO -> Assignment for a class attr {var_id}")
-                # TODO: Get the class attribute id
-                self.visitCall(ctx.call())
-                # TODO: check for the class attribute in the instance
-                
+            # Check if we are inside a class
+            if self.in_init and self.current_class is not None and ctx.call():
+                # We are initializing a class attribute
+                self.log(f"INFO -> This is a initialization for class attr {var_id}")
+                # Create a new variable symbol for the attribute
+                attribute = Variable(var_id, type="attr")
+                # Visit the assignment node
+                data_type = self.visitAssignment(ctx.assignment())
+                # Set the type of the attribute
+                attribute.set_type(data_type)
+                # Add the attribute to the current class
+                self.current_class.attributes.append(attribute)
+                # Add the attribute to the symbol table
+                self.add_symbol(attribute)
 
-            else:
-                # The assignment is for a variable
-                # TODO: check for the variable in the symbol table
-                self.log(f"INFO -> Assignment for a variable")
             
-            # Visit the assignment node
-            self.visitAssignment(ctx.assignment())
+            # Check if the assignment is for a class attribute
+            elif ctx.call() and self.current_class is not None:
+                self.log(f"INFO -> Assignment for a class attr {var_id}")
+                # Visit the call node to validate the attribute
+                self.visitCall(ctx.call())
+                return self.visitAssignment(ctx.assignment())
+                
+            elif ctx.call():
+                # We are calling a function or a class attribute
+                self.log(f"INFO -> Call for function or class attribute {var_id}")
+                # Get the type of the function or class attribute
+                type = self.visitCall(ctx.call())
+
 
         else:
             # The assignment is a wrapper node, skip it
             # and visit the logic_or node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitLogic_or(ctx.logic_or())
+            return self.visitLogic_or(ctx.logic_or())
 
     
     def visitLogic_or(self, ctx:compiscriptParser.Logic_orContext):
@@ -237,17 +321,23 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if the logic_or isn't a wrapper node
         if ctx.getChildCount() > 1:
             logic_ands = []
-            # TODO: Get the logic_and nodes and visit them
             for logic_and in ctx.logic_and():
                 self.log(f"INFO -> logic_and node: {logic_and.getText()}")
-                self.visitLogic_and(logic_and)
+                logic_ands.append(self.visitLogic_and(logic_and))
             
-
+            # Check if all the logic_and nodes are boolean type
+            for logic_and in logic_ands:
+                if not isinstance(logic_and, BooleanType):
+                    raise Exception(f"Invalid type for logic_or node got: {logic_and.name}, expected: bool")
+            
+            # The logic_or is a boolean type
+            return BooleanType()
+        
         else:
             # The logic_or is a wrapper node, skip it
             # and visit the logic_and node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitLogic_and(ctx.logic_and(0))
+            return self.visitLogic_and(ctx.logic_and(0))
 
 
     def visitLogic_and(self, ctx:compiscriptParser.Logic_andContext):
@@ -256,17 +346,22 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if the logic_and isn't a wrapper node
         if ctx.getChildCount() > 1:
             equalities = []
-            # TODO: Get the equality nodes and visit them
             for equality in ctx.equality():
                 self.log(f"INFO -> equality node: {equality.getText()}")
-                self.visitEquality(equality)
+                equalities.append(self.visitEquality(equality))
+            # check if all the equality nodes are boolean type
+            for equality in equalities:
+                if not isinstance(equality, BooleanType):
+                    raise Exception(f"Invalid type for logic_and node got: {equality.name}, expected: bool")
                 
-            
+            # The logic_and is a boolean type
+            return BooleanType()
+        
         else:
             # The logic_and is a wrapper node, skip it
             # and visit the equality node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitEquality(ctx.equality(0))
+            return self.visitEquality(ctx.equality(0))
 
 
     def visitEquality(self, ctx:compiscriptParser.EqualityContext):
@@ -275,16 +370,23 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if the equality isn't a wrapper node
         if ctx.getChildCount() > 1:
             comparisons = []
-            # TODO: Get the comparison nodes and visit them
             for comparison in ctx.comparison():
                 self.log(f"INFO -> Comparison node: {comparison.getText()}")
-                self.visitComparison(comparison)
+                comparisons.append(self.visitComparison(comparison))
+            # Check if all the comparison nodes are of the same type
+            # all comparisons must be of the same type
+            for comparison in comparisons:
+                if not isinstance(comparison, comparisons[0].__class__):
+                    raise Exception(f"Invalid type for equality node got: {comparison.name}, expected: {comparisons[0].name}")
+                
+            # The equality is a boolean type
+            return BooleanType()
 
         else:
             # The equality is a wrapper node, skip it
             # and visit the comparison node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitComparison(ctx.comparison(0))
+            return self.visitComparison(ctx.comparison(0))
 
 
     def visitComparison(self, ctx:compiscriptParser.ComparisonContext):
@@ -295,15 +397,22 @@ class SemanticAnalyzer(compiscriptVisitor):
             terms = []
             # Get the term nodes
             for term in ctx.term():
-                # TODO: visit the term node and get type
                 self.log(f"INFO -> Term node: {term.getText()}")
-                self.visitTerm(term)
+                terms.append(self.visitTerm(term))
+
+            # Check if all the term nodes are of number type
+            for term in terms:
+                if not isinstance(term, NumberType):
+                    raise Exception(f"Invalid type for comparison node got: {term.name}, expected: num")
+                
+            # The comparison is a boolean type
+            return BooleanType()
 
         else:
             # The comparison is a wrapper node, skip it
             # and visit the term node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitTerm(ctx.term(0))
+            return self.visitTerm(ctx.term(0))
 
     
     def visitTerm(self, ctx:compiscriptParser.TermContext):
@@ -311,18 +420,53 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the term isn't a wrapper node
         if ctx.getChildCount() > 1:
+            # Get the operators
+            term_operators = []
+            minus = False
+
+            # get the + - operators from the term
+            for i in range(1, len(ctx.children), 2):
+                term_operators.append(ctx.children[i].getText())
+
+            # Check if there are - operators
+            # This means the term is a subtraction and must be of number type
+            if "-" in term_operators:
+                minus = True
+
             factors = []
             # Get the factor nodes
             for factor in ctx.factor():
-                # TODO: visit the factor node and get type
                 self.log(f"INFO -> Factor node: {factor.getText()}")
-                self.visitFactor(factor)
+                factors.append(self.visitFactor(factor))
+
+            # Check if all the factor nodes are of number type if there are - operators
+            if minus:
+                # Check if we are in a print statement
+                # The operator - is not valid in a print statement
+                if self.in_print:
+                    raise Exception(f"Invalid operator - in print statement")
+
+                for factor in factors:
+                    if not isinstance(factor, NumberType):
+                        raise Exception(f"Invalid type for term node got: {factor.name}, expected: num")
+                    
+                # The term is a number type
+                return NumberType()
                 
+            else:
+                # If there are no - operators, the term may be of number or string type
+                # Check if theres a string in the factors
+                if any(isinstance(factor, StringType) for factor in factors):
+                    # If there's a string, the term is a string type
+                    return StringType()
+                else:
+                    # If there's no string, the term is a number type
+                    return NumberType()
         else:
             # The term is a wrapper node, skip it
             # and visit the factor node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitFactor(ctx.factor(0))
+            return self.visitFactor(ctx.factor(0))
 
 
     def visitFactor(self, ctx:compiscriptParser.FactorContext):
@@ -331,16 +475,24 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if the factor isn't a wrapper node
         if ctx.getChildCount() > 1:
             # Get the unary nodes
+            unaries = []
             for unary in ctx.unary():
-                # TODO: visit the unary node and get type
                 self.log(f"INFO -> Unary node: {unary.getText()}")
-                self.visitUnary(unary)
+                unaries.append(self.visitUnary(unary))
+
+            # Check if all the unary nodes are of number type
+            for unary in unaries:
+                if not isinstance(unary, NumberType):
+                    raise Exception(f"Invalid type for factor node got: {unary.name}, expected: num")
+                
+            # The factor is a number type
+            return NumberType()
 
         else:
             # The factor is a wrapper node, skip it
             # and visit the unary node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitUnary(ctx.unary(0))
+            return self.visitUnary(ctx.unary(0))
 
 
     def visitUnary(self, ctx:compiscriptParser.UnaryContext):
@@ -353,9 +505,26 @@ class SemanticAnalyzer(compiscriptVisitor):
                 # Get the negation operator
                 negation = ctx.getChild(0).getText()
                 # Visit the unary node
-                self.visitUnary(ctx.unary())
-                # TODO: check for the type of the unary node
-            
+                unray_type = self.visitUnary(ctx.unary())
+                # Check if the negation operator is valid for the unary type
+                if negation == "!":
+                    self.log(f"INFO -> Negation operator: {negation}")
+                    # Check if the unary type is a boolean
+                    if not isinstance(unray_type, BooleanType):
+                        raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type.name}, expected: bool")
+                    
+                    # The unary is a boolean type
+                    return BooleanType()
+                
+                elif negation == "-":
+                    self.log(f"INFO -> Negation operator: {negation}")
+                    # Check if the unary type is a number
+                    if not isinstance(unray_type, NumberType):
+                        raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type.name}, expected: num")
+                    
+                    # The unary is a number type
+                    return NumberType()
+
             else:
                 # If isnt a negation operator, its not a valid unary operator
                 raise Exception(f"Invalid unary operator: {ctx.getChild(0).getText()}")
@@ -364,7 +533,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             # The unary is a wrapper node, skip it
             # and visit the primary node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitCall(ctx.call())
+            return self.visitCall(ctx.call())
 
 
     def visitCall(self, ctx:compiscriptParser.CallContext):
@@ -373,16 +542,13 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if the call isn't a wrapper node
         if ctx.getChildCount() > 1:
             
-            # TODO: Get the function identifier
             self.visitPrimary(ctx.primary())
 
             # Check if the call is a function call
             if ctx.getChild(1).getText() == "(":
-                
 
                 # Check if the function call has arguments
                 if ctx.arguments():
-                    # TODO: Get the function arguments
                     self.visitArguments(ctx.arguments(0))
 
             # Check if the call is a class attribute call
@@ -391,11 +557,29 @@ class SemanticAnalyzer(compiscriptVisitor):
                 attribute = ctx.IDENTIFIER(0).getText()
                 self.log(f"INFO -> Attribute: {attribute}")
 
+                # Search for the attribute in the symbol table
+                if self.in_class_assignment:
+                    symbol = self.current_class.search_attribute(attribute)
+                    if symbol is None:
+                        raise Exception(f"Attribute {attribute} not found in class {self.current_class.id}")
+                
+                    return symbol.data_type
+                else:
+                    # We are outside of a class, search for the attribute in the symbol table
+                    symbol = self.search_symbol(attribute, Variable)
+                    if symbol is None:
+                        # Check if the attribute is a method
+                        symbol = self.search_symbol(attribute, Function)
+                        if symbol is None:
+                            raise Exception(f"Class attribute {attribute} not found in symbol table")
+                    
+                    return symbol.data_type
+
         else:
             # The call is a wrapper node, skip it
             # and visit the primary node
             self.log("INFO -> Wrapper node, skipping...")
-            self.visitPrimary(ctx.primary())
+            return self.visitPrimary(ctx.primary())
 
 
     def visitPrimary(self, ctx:compiscriptParser.PrimaryContext):
@@ -438,22 +622,31 @@ class SemanticAnalyzer(compiscriptVisitor):
                 # Get the identifier
                 identifier = ctx.IDENTIFIER().getText()
                 self.log(f"INFO -> Identifier: {identifier}")
-                # TODO: check for the identifier in the symbol table
+                # Search for the identifier in the symbol table
+                symbol = self.search_symbol(identifier, Variable)
+                # Check if the symbol is found
+                if symbol is None:
+                    raise Exception(f"Identifier {identifier} not found in symbol table")
+ 
+                # The primary is a variable, return the data type of the variable
+                return symbol.data_type
 
             # Check if the primary is a this keyword
             elif primary_str == "this":
-                self.log(f"INFO -> this keyword")
-                # TODO: check for the current class
+                self.log(f"INFO -> 'this' keyword found")
+                # If we are not inside a class, the this keyword is invalid
+                if self.current_class is None:
+                    raise Exception(f"Invalid this keyword outside a class")
 
             # Check if the primary is a instantiation
             elif ctx.instantiation():
-                self.visitInstantiation(ctx.instantiation())
+                return self.visitInstantiation(ctx.instantiation())
 
         else:
             # The primary has children, is a expression or a super call
             # Check if the primary is a expression
             if ctx.expression():
-                self.visitExpression(ctx.expression())
+                return self.visitExpression(ctx.expression())
 
             # Check if the primary is a super call
             if ctx.getChild(0).getText() == "super":
@@ -465,12 +658,21 @@ class SemanticAnalyzer(compiscriptVisitor):
         self.log("VISIT -> Instantiation node")
         # Get the class identifier
         class_id = ctx.IDENTIFIER().getText()
-        # TODO: check for the class in the symbol table
+        # Search for the class in the symbol table
+        class_symbol = self.search_symbol(class_id, Class)
+        # Check if the class is found
+        if class_symbol is None:
+            raise Exception(f"Class {class_id} not found in symbol table")
+        
+        self.log(f"INFO -> Instantiation for class: {class_id}")
         
         # Check if the instantiation has arguments
         if ctx.arguments():
             # Get the arguments
             self.visitArguments(ctx.arguments())
+
+        # This means variable instantiation is a instance of the class
+        return InstanceType(size=class_symbol.size)
 
 
     def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):
@@ -490,10 +692,18 @@ class SemanticAnalyzer(compiscriptVisitor):
             param_id = param.getText()
             self.log(f"INFO -> Parameter: {param_id}")
 
-            # TODO: create a new variable symbol for the parameter
-            # TODO: set the type of the variable as parameter type
-            # TODO: set the parameter as any type
-            # TODO: add the parameter to the symbol table
+            # Create a new variable symbol for the parameter
+            parameter = Variable(param_id)
+            # Set the type of the variable as parameter type
+            parameter.type = "param"
+            # Set the parameter as any type
+            parameter.set_type(AnyType())
+
+            # Add the parameter to the symbol table
+            self.add_symbol(parameter)
+
+            # Add the parameter to the current function
+            self.current_function.parameters.append(parameter)
 
 
     def visitStatement(self, ctx:compiscriptParser.StatementContext):
@@ -545,7 +755,8 @@ class SemanticAnalyzer(compiscriptVisitor):
     def visitIfStmt(self, ctx:compiscriptParser.IfStmtContext):
         self.log("VISIT -> IfStmt node")
         # Enter the if scope
-        self.enter_scope("if")
+        self.enter_scope(f"if_{self.if_qty}")
+        self.if_qty += 1    # Increment the if quantity
 
         # Visit the expression node
         self.visitExpression(ctx.expression())
@@ -561,7 +772,8 @@ class SemanticAnalyzer(compiscriptVisitor):
         if ctx.statement(1):
             self.log("INFO -> If statement has an else statement")
             # Enter the else scope
-            self.enter_scope("else")
+            self.enter_scope(f"else_{self.else_qty}")
+            self.else_qty += 1  # Increment the else quantity
             # Visit the else statement node
             self.visitStatement(ctx.statement(1))
             # Exit the else scope
@@ -571,7 +783,8 @@ class SemanticAnalyzer(compiscriptVisitor):
     def visitForStmt(self, ctx:compiscriptParser.ForStmtContext):
         self.log("VISIT -> ForStmt node")
         # Enter the for scope
-        self.enter_scope("for")
+        self.enter_scope(f"for_{self.for_qty}")
+        self.for_qty += 1   # Increment the for quantity
 
         # Check if the for has the correct definition
         # First check for the variable declaration or expression statement
@@ -608,7 +821,8 @@ class SemanticAnalyzer(compiscriptVisitor):
     def visitWhileStmt(self, ctx:compiscriptParser.WhileStmtContext):
         self.log("VISIT -> WhileStmt node")
         # Enter the while scope
-        self.enter_scope("while")
+        self.enter_scope(f"while_{self.while_qty}")
+        self.while_qty += 1 # Increment the while quantity
 
         # Visit the expression node
         self.visitExpression(ctx.expression())
@@ -623,16 +837,29 @@ class SemanticAnalyzer(compiscriptVisitor):
     def visitReturnStmt(self, ctx:compiscriptParser.ReturnStmtContext):
         self.log("VISIT -> ReturnStmt node")
 
+        # Check if the function is not a constructor
+        if self.in_init:
+            raise Exception("Constructor cannot return a value")
+        
+        # Check if we are inside a function
+        if self.current_function is None:
+            raise Exception("Return statement outside a function")
+
         # Check if theres a return expression
         if ctx.expression():
-            # Visit the expression node
-            self.visitExpression(ctx.expression())
+            # Visit the expression node and set the return type of the function
+            self.current_function.return_type = self.visitExpression(ctx.expression())
+
         else:
             self.log("INFO -> Return statement without expression")
-            # TODO: this means we are returning nil
+            # The function returns nil by default
+            
+
 
     def visitPrintStmt(self, ctx:compiscriptParser.PrintStmtContext):
         self.log("VISIT -> PrintStmt node")
+        self.in_print = True    # Set the print flag to true
         # Visit the expression node
         self.visitExpression(ctx.expression())
-        #TODO: check for the type of the expression must be string
+        # Check if the print type is a string
+        self.in_print = False   # Reset the print flag
