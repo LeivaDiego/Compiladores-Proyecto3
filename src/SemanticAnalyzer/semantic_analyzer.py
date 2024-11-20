@@ -28,6 +28,8 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Helper flags
         self.in_init = False                    # Flag to check if we are in a class initializer
         self.in_class_assignment = False              # Flag to check if we are in an assignment
+        self.method_flag = False                 # Flag to check if we are in a class method
+        self.in_print = False                    # Flag to check if we are in a print statement
 
     def log(self, message):
         if self.logging:
@@ -125,7 +127,15 @@ class SemanticAnalyzer(compiscriptVisitor):
             
         # If the symbol is not found return None
         return None
-
+    
+    def lookup_symbol(self, id, type: Symbol):
+        for symbol in reversed(self.symbol_table):
+            if symbol.id == id and isinstance(symbol, type) and symbol.scope == self.current_scope:
+                return symbol
+            
+        # If the symbol is not found return None
+        return None
+    
 
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
         self.log("VISIT -> Program node")
@@ -181,9 +191,6 @@ class SemanticAnalyzer(compiscriptVisitor):
         if parent_class is not None:
             self.log(f"INFO -> Creating class symbol with parent attributes and methods")
             self.current_class = Class(class_id, parent=parent_class)
-            # Get the parent attributes and methods
-            self.current_class.get_parent_attributes()
-            self.current_class.get_parent_methods()
 
         else:
             # The class is standalone without a parent
@@ -204,7 +211,14 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Exit the class scope
         self.exit_scope()
+        
+        # Before adding the class to the symbol table
+        # Check if the class is already declared in the current scope
+        symbol = self.lookup_symbol(class_id, Class)
+        if symbol is not None:
+            raise Exception(f"Class {class_id} already declared in scope {self.current_scope.id}")
 
+        # If the class is not already declared
         # Add the class symbol to the symbol table
         self.add_symbol(self.current_class)
 
@@ -229,6 +243,13 @@ class SemanticAnalyzer(compiscriptVisitor):
         if fun_id == "init" and self.current_class is not None:
             self.log(f"INFO -> This function is a constructor for class: {self.current_class.id}")
             self.in_init = True
+            self.method_flag = True
+        
+        elif self.current_class is not None and self.in_class_assignment:
+            # We are inside a class and the function is not a constructor
+            # This means the function is a method of the class
+            self.log(f"INFO -> This function is a method for class: {self.current_class.id}")
+            self.method_flag = True
 
         # Create a new function symbol
         self.current_function = Function(fun_id)
@@ -246,6 +267,17 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Exit the function scope
         self.exit_scope()
+        # Before adding the function to the symbol table
+        # Check if the function is already declared in the current scope
+        symbol = self.lookup_symbol(fun_id, Function)
+        if symbol is not None:
+            raise Exception(f"Function {fun_id} already declared in scope {self.current_scope.id}")
+        
+        # If the function is a method of a class
+        if self.method_flag:
+            # Add the method to the current class
+            self.current_class.methods.append(self.current_function)
+            self.method_flag = False
 
         # Add the function symbol to the symbol table
         self.add_symbol(self.current_function)
@@ -285,6 +317,12 @@ class SemanticAnalyzer(compiscriptVisitor):
             # set the type to any
             self.log(f"INFO -> Variable type set to any")
             self.current_variable.set_type(AnyType())
+
+        # Before adding the variable to the symbol table
+        # Check if the variable is already declared in the current scope
+        symbol = self.lookup_symbol(var_id, Variable)
+        if symbol is not None:
+            raise Exception(f"Variable {var_id} already declared in scope {self.current_scope.id}")
 
         # Add the variable symbol to the symbol table
         self.add_symbol(self.current_variable)
@@ -719,10 +757,42 @@ class SemanticAnalyzer(compiscriptVisitor):
         
         self.log(f"INFO -> Instantiation for class: {class_id}")
         
+        args = None   # List to store the arguments
+
         # Check if the instantiation has arguments
         if ctx.arguments():
             # Get the arguments
-            self.visitArguments(ctx.arguments())
+            args = self.visitArguments(ctx.arguments())
+
+
+        # Search for the initializer method in the class
+        initializer = class_symbol.search_method(f"init")
+
+        # Check if the instantiation has proper amount of arguments
+        if len(args) != len(initializer.parameters):
+            raise Exception(f"Invalid amount of arguments for instantiation of class {class_id}, got: {len(args)}, expected: {len(initializer.parameters)}")
+
+        # Check if the class is completed or not
+        if not class_symbol.completed:
+            # Check if any of the attributes of the reference class are any type
+            i = 0
+            offset = None
+            for idx, attr in enumerate(class_symbol.attributes):
+                
+                offset = attr.offset if idx == 0 else offset # Get the offset of the first attribute
+                
+                # Check if the attribute is of any type
+                if isinstance(attr.data_type, AnyType):
+                    attr.set_type(args[i])
+                    i += 1
+                
+                attr.offset = offset
+                offset += attr.size
+
+            # At this point it is safe to assume the instantiation is valid
+            # Update the size of class symbol with the new attributes
+            class_symbol.set_size()
+            class_symbol.completed = True
 
         # This means variable instantiation is a instance of the class
         return InstanceType(size=class_symbol.size)
@@ -731,10 +801,13 @@ class SemanticAnalyzer(compiscriptVisitor):
     def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):
         self.log("VISIT -> Arguments node")
         # Get the expression nodes
+        args = []
         for expression in ctx.expression():
             # Visit the expression node
             self.log(f"INFO -> Expression in arguments: {expression.getText()}")
-            self.visitExpression(expression)
+            args.append(self.visitExpression(expression))
+        
+        return args
 
 
     def visitParameters(self, ctx:compiscriptParser.ParametersContext):
@@ -746,17 +819,17 @@ class SemanticAnalyzer(compiscriptVisitor):
             self.log(f"INFO -> Parameter: {param_id}")
 
             # Create a new variable symbol for the parameter
-            parameter = Variable(param_id)
-            # Set the type of the variable as parameter type
-            parameter.type = "param"
+            parameter = Variable(param_id, type="param")
+
             # Set the parameter as any type
             parameter.set_type(AnyType())
+
+            # Add the parameter to the current function
+            self.current_function.parameters.append(parameter)
 
             # Add the parameter to the symbol table
             self.add_symbol(parameter)
 
-            # Add the parameter to the current function
-            self.current_function.parameters.append(parameter)
 
 
     def visitStatement(self, ctx:compiscriptParser.StatementContext):
@@ -812,9 +885,11 @@ class SemanticAnalyzer(compiscriptVisitor):
         self.if_qty += 1    # Increment the if quantity
 
         # Visit the expression node
-        self.visitExpression(ctx.expression())
-        # TODO: check for the type of the expression
-
+        type = self.visitExpression(ctx.expression())
+        # Check if the expression is a boolean type
+        if not isinstance(type, BooleanType) and not isinstance(type, AnyType):
+            raise Exception(f"Invalid type for if statement condition got: {type.name}, expected: bool")
+                            
         # Visit the statement node
         self.visitStatement(ctx.statement(0))
 
@@ -878,8 +953,11 @@ class SemanticAnalyzer(compiscriptVisitor):
         self.while_qty += 1 # Increment the while quantity
 
         # Visit the expression node
-        self.visitExpression(ctx.expression())
-
+        type = self.visitExpression(ctx.expression())
+        # Check if the expression is a boolean type
+        if not isinstance(type, BooleanType) and not isinstance(type, AnyType):
+            raise Exception(f"Invalid type for while statement condition got: {type.name}, expected: bool")
+        
         # Visit the statement node
         self.visitStatement(ctx.statement())
 
@@ -901,7 +979,7 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if theres a return expression
         if ctx.expression():
             # Visit the expression node and set the return type of the function
-            self.current_function.return_type = self.visitExpression(ctx.expression())
+            self.current_function.returns.appennd(self.visitExpression(ctx.expression()))
 
         else:
             self.log("INFO -> Return statement without expression")

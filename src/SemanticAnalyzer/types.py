@@ -11,11 +11,11 @@ class InstanceType(DataType):
         super().__init__(name, size)
         
 class AnyType(DataType):
-    def __init__(self, name="any", size=10):
+    def __init__(self, name="any", size=8):
         super().__init__(name, size)
 
 class NumberType(DataType):
-    def __init__(self, name="num", size=8):
+    def __init__(self, name="num", size=4):
         super().__init__(name, size)
 
 class StringType(DataType):

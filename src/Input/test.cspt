@@ -6,12 +6,7 @@ class Persona {
   }
 
   saludar() {
-    print "Hola, mi nombre es " + this.nombre;
-  }
-
-  incrementarEdad(anos) {
-    this.edad = this.edad + anos;
-    print "Ahora tengo " + this.edad + " anios.";
+    print "Hola, mi nombre es " + this.color;
   }
 }
 
@@ -24,19 +19,14 @@ class Estudiante extends Persona {
   estudiar() {
     print this.nombre + " esta estudiando en " + this.grado + " grado.";
   }
-
-  promedioNotas(nota1, nota2, nota3) {
-    var promedio = (nota1 + nota2 + nota3) / 3;
-    print "El promedio de " + this.nombre + " es " + promedio;
-  }
 }
 
 var nombre = "Erick";
 
+var ropero = new Persona(nombre, 20);
 var juan = new Estudiante(nombre, 20, 3);
-juan.saludar();    // Salida: Hola, mi nombre es Erick
-juan.estudiar();   // Salida: Erick esta estudiando en 3 grado
-juan.incrementarEdad(5);
+juan.saludar();    // Salida: Hola, mi nombre es Juan
+juan.estudiar();   // Salida: Juan esta estudiando en 3 grado
 
 for (var i = 1; i <= 5; i = i + 1) {
   if (i % 2 == 0) {
@@ -46,6 +36,9 @@ for (var i = 1; i <= 5; i = i + 1) {
   }
 }
 
-// Expresion aritmetica
-var resultado = (juan.edad * 2) + (5 - 3) / 2;
-print "Resultado de la expresion: " + resultado;
+while (juan.edad < 25) {
+  juan.edad = juan.edad + 1;
+  print "Edad de Juan: " + juan.edad;
+}
+
+var x = "test";
