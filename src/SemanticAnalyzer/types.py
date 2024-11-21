@@ -9,7 +9,7 @@ class DataType():
 class InstanceType(DataType):
     def __init__(self, name="instance", size=0, class_ref=None):
         super().__init__(name, size)
-        class_ref = None
+        self.class_ref = class_ref
         
 class AnyType(DataType):
     def __init__(self, name="any", size=8):

@@ -118,6 +118,9 @@ class Class(Symbol):
         for attr in self.attributes:
             if attr.id == id:
                 return attr
+        if self.parent:
+            return self.parent.search_attribute(id)
+        
         return None
     
 
@@ -128,10 +131,14 @@ class Class(Symbol):
         for method in self.methods:
             if method.id == id:
                 return method
+        
+        if self.parent:
+            return self.parent.search_method(id)
+        
         return None
 
     def __str__(self):
-        return f"{self.type}: {self.id} | size: {self.size} | scope: {self.scope.id}"
+        return f"{self.type}: {self.id} | size: {self.size} | scope: {self.scope.id} | parent: {self.parent} | methods: {self.methods}"
 
 
 # --------------------------------------------------------------------- #

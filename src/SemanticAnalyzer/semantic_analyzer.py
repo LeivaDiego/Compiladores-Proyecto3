@@ -663,8 +663,25 @@ class SemanticAnalyzer(compiscriptVisitor):
                 # Check if the call is a class method call and outside a class
                 elif ctx.getChild(3):
                     # Get the method identifier
-                    method = ctx.IDENTIFIER(0).getText()
-                    self.log(f"INFO -> Method: {method}")
+                    method_id = ctx.IDENTIFIER(0).getText()
+                    self.log(f"INFO -> Method: {method_id}")
+
+                    # Search if the method is part of the instance
+                    if ctx.primary().IDENTIFIER():
+                        # Get the class instance
+                        class_id = ctx.primary().IDENTIFIER().getText()
+                        class_instance = self.search_symbol(class_id, Variable)
+                        # Search for the class in the symbol table
+                        class_symbol = self.search_symbol(class_instance.data_type.class_ref, Class)
+
+                        if class_symbol is not None:
+                            method = class_symbol.search_method(method_id)
+                            if method is not None:
+                                return method.return_type
+                            else:
+                                raise Exception(f"Method '{method_id}' not found in instance '{class_id}' of class {class_symbol.id}")
+                        else:
+                            raise Exception(f"Instance '{class_id}' not found in symbol table")
 
                     # Search for the method in the symbol table
                     for symbol in self.symbol_table:
@@ -866,7 +883,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             class_symbol.completed = True
 
         # This means variable instantiation is a instance of the class
-        return InstanceType(size=class_symbol.size, class_ref=class_symbol)
+        return InstanceType(size=class_symbol.size, class_ref=class_symbol.id)
 
 
     def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):
