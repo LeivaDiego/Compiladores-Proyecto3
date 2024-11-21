@@ -188,6 +188,9 @@ class SemanticAnalyzer(compiscriptVisitor):
             self.log(f"INFO -> Inherits from class: {parent_id}")
             parent_class = self.search_symbol(parent_id, Class)
 
+            if parent_class is None:
+                raise Exception(f"Parent class {parent_id} not found in symbol table")
+
         # Create a new class symbol
         if parent_class is not None:
             self.log(f"INFO -> Creating class symbol with parent attributes and methods")
@@ -608,6 +611,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             return self.visitCall(ctx.call())
 
 
+    
     def visitCall(self, ctx:compiscriptParser.CallContext):
         self.log("VISIT -> Call node")
 
@@ -631,7 +635,6 @@ class SemanticAnalyzer(compiscriptVisitor):
                             # Check if the symbol exists in the symbol table
                             if symbol.id == function_id and isinstance(symbol, Function):
                                 # Check if the arguments match the function parameters
-                                print("evaluando funcion", symbol)
                                 if len(args) != len(symbol.parameters):
                                     raise Exception(f"Invalid number of arguments for function {function_id}, got: {len(args)}, expected: {len(symbol.parameters)}")
                                 break
@@ -797,6 +800,21 @@ class SemanticAnalyzer(compiscriptVisitor):
                 self.log(f"INFO -> Super call: {identifier}")
                 self.super_call = True
 
+                # Search for the function in the parent class
+                if self.current_class is not None:
+                    if self.current_class.parent is not None:
+                        symbol = self.current_class.parent.search_method(identifier)
+                        if symbol is None:
+                            raise Exception(f"Method {identifier} not found in parent class {self.current_class.parent.id}")
+                        
+                        return symbol.return_type
+                    
+                    else:
+                        raise Exception(f"Parent class not found for class {self.current_class.id}")
+                
+                else:
+                    raise Exception(f"Super call outside of class")
+
 
     def visitInstantiation(self, ctx:compiscriptParser.InstantiationContext):
         self.log("VISIT -> Instantiation node")
@@ -848,7 +866,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             class_symbol.completed = True
 
         # This means variable instantiation is a instance of the class
-        return InstanceType(size=class_symbol.size)
+        return InstanceType(size=class_symbol.size, class_ref=class_symbol)
 
 
     def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):

@@ -33,7 +33,7 @@ def main():
     tree_visualizer = TreeVisualizer(input_file)
     tree_visualizer.visit(parse_tree)
     tree_visualizer.render(output_file=tree_visualizer.name, 
-                           format='png', 
+                           format='png',
                            output_dir='src/ParseTree/Output')
     
     # Create a semantic analyzer and visit the parse tree

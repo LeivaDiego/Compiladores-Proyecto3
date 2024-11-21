@@ -7,8 +7,9 @@ class DataType():
         return self.name
 
 class InstanceType(DataType):
-    def __init__(self, name="instance", size=0):
+    def __init__(self, name="instance", size=0, class_ref=None):
         super().__init__(name, size)
+        class_ref = None
         
 class AnyType(DataType):
     def __init__(self, name="any", size=8):
