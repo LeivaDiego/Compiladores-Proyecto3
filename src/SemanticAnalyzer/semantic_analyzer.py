@@ -631,9 +631,11 @@ class SemanticAnalyzer(compiscriptVisitor):
                             # Check if the symbol exists in the symbol table
                             if symbol.id == function_id and isinstance(symbol, Function):
                                 # Check if the arguments match the function parameters
+                                print("evaluando funcion", symbol)
                                 if len(args) != len(symbol.parameters):
-                                    raise Exception(f"Invalid number of arguments for function {function_id}")
-                            break
+                                    raise Exception(f"Invalid number of arguments for function {function_id}, got: {len(args)}, expected: {len(symbol.parameters)}")
+                                break
+
                 return call_type
        
             # Check if the call is a class attribute call
