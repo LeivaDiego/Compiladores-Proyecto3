@@ -25,7 +25,7 @@ var nombre = "Erick";
 
 var ropero = new Persona(nombre, 20);
 var juan = new Estudiante(nombre, 20, 3);
-juan.saludar();    // Salida: Hola, mi nombre es Juan
+juan.saludar(0);    // Salida: Hola, mi nombre es Juan
 juan.estudiar();   // Salida: Juan esta estudiando en 3 grado
 
 for (var i = 1; i <= 5; i = i + 1) {
@@ -40,5 +40,3 @@ while (juan.edad < 25) {
   juan.edad = juan.edad + 1;
   print "Edad de Juan: " + juan.edad;
 }
-
-var x = "test";

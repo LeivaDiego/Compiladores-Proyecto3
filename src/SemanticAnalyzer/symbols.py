@@ -41,8 +41,14 @@ class Function(Symbol):
     def __init__(self, id, type="fun"):
         super().__init__(id, type)
         self.parameters = []
-        self.returns: list[DataType] = []      # The return types of the function
         self.return_type = NilType()           # The return type of the function
+        self.return_count = 0                  # The number of return statements in the function
+
+    def set_return_type(self, data_type: DataType):
+        """
+        Set the return type of the function
+        """
+        self.return_type = data_type
 
     def __str__(self):
         return f"{self.type}: {self.id} | return type: {self.return_type} | scope: {self.scope.id}"

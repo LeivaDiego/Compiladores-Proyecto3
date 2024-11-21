@@ -26,10 +26,11 @@ class SemanticAnalyzer(compiscriptVisitor):
         self.else_qty = 0                       # The quantity of else statements
 
         # Helper flags
-        self.in_init = False                    # Flag to check if we are in a class initializer
-        self.in_class_assignment = False              # Flag to check if we are in an assignment
+        self.in_init = False                     # Flag to check if we are in a class initializer
+        self.in_class_assignment = False         # Flag to check if we are in an assignment
         self.method_flag = False                 # Flag to check if we are in a class method
         self.in_print = False                    # Flag to check if we are in a print statement
+        self.super_call = False                  # Flag to check if we are in a super call
 
     def log(self, message):
         if self.logging:
@@ -399,7 +400,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Check if all the logic_and nodes are boolean type
             for logic_and in logic_ands:
                 if not isinstance(logic_and, BooleanType) and not isinstance(logic_and, AnyType):
-                    raise Exception(f"Invalid type for logic_or node got: {logic_and.name}, expected: bool")
+                    raise Exception(f"Invalid type for logic_or node got: {logic_and}, expected: bool")
             
             # The logic_or is a boolean type
             return BooleanType()
@@ -423,8 +424,8 @@ class SemanticAnalyzer(compiscriptVisitor):
             # check if all the equality nodes are boolean type
             for equality in equalities:
                 if not isinstance(equality, BooleanType) and not isinstance(equality, AnyType):
-                    raise Exception(f"Invalid type for logic_and node got: {equality.name}, expected: bool")
-                
+                    raise Exception(f"Invalid type for logic_and node got: {equality}, expected: bool")
+
             # The logic_and is a boolean type
             return BooleanType()
         
@@ -448,7 +449,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             # all comparisons must be of the same type
             for comparison in comparisons:
                 if not isinstance(comparison, comparisons[0].__class__) and not isinstance(comparison, AnyType):
-                    raise Exception(f"Invalid type for equality node got: {comparison.name}, expected: {comparisons[0].name}")
+                    raise Exception(f"Invalid type for equality node got: {comparison}, expected: {comparisons[0]}")
                 
             # The equality is a boolean type
             return BooleanType()
@@ -474,7 +475,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Check if all the term nodes are of number type
             for term in terms:
                 if not isinstance(term, NumberType) and not isinstance(term, AnyType):
-                    raise Exception(f"Invalid type for comparison node got: {term.name}, expected: num")
+                    raise Exception(f"Invalid type for comparison node got: {term}, expected: num")
                 
             # The comparison is a boolean type
             return BooleanType()
@@ -519,7 +520,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
                 for factor in factors:
                     if not isinstance(factor, NumberType) and not isinstance(factor, AnyType):
-                        raise Exception(f"Invalid type for term node got: {factor.name}, expected: num")
+                        raise Exception(f"Invalid type for term node got: {factor}, expected: num")
                     
                 # The term is a number type
                 return NumberType()
@@ -554,7 +555,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             # Check if all the unary nodes are of number type
             for unary in unaries:
                 if not isinstance(unary, NumberType) and not isinstance(unary, AnyType):
-                    raise Exception(f"Invalid type for factor node got: {unary.name}, expected: num")
+                    raise Exception(f"Invalid type for factor node got: {unary}, expected: num")
                 
             # The factor is a number type
             return NumberType()
@@ -582,7 +583,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                     self.log(f"INFO -> Negation operator: {negation}")
                     # Check if the unary type is a boolean
                     if not isinstance(unray_type, BooleanType) and not isinstance(unray_type, AnyType):
-                        raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type.name}, expected: bool")
+                        raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type}, expected: bool")
                     
                     # The unary is a boolean type
                     return BooleanType()
@@ -591,7 +592,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                     self.log(f"INFO -> Negation operator: {negation}")
                     # Check if the unary type is a number
                     if not isinstance(unray_type, NumberType) and not isinstance(unray_type, AnyType):
-                        raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type.name}, expected: num")
+                        raise Exception(f"Invalid type for negation operator: {negation}, got: {unray_type}, expected: num")
                     
                     # The unary is a number type
                     return NumberType()
@@ -613,15 +614,28 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if the call isn't a wrapper node
         if ctx.getChildCount() > 1:
             
-            self.visitPrimary(ctx.primary())
+            call_type = self.visitPrimary(ctx.primary())
 
             # Check if the call is a plain function call
             if ctx.getChild(1).getText() == "(":
-
+                
                 # Check if the function call has arguments
                 if ctx.arguments():
-                    self.visitArguments(ctx.arguments(0))
+                    args = self.visitArguments(ctx.arguments(0))
 
+                    # Get the function identifier
+                    if ctx.primary().IDENTIFIER():
+                        # Get the function reference
+                        function_id = ctx.primary().IDENTIFIER().getText()
+                        for symbol in self.symbol_table:
+                            # Check if the symbol exists in the symbol table
+                            if symbol.id == function_id and isinstance(symbol, Function):
+                                # Check if the arguments match the function parameters
+                                if len(args) != len(symbol.parameters):
+                                    raise Exception(f"Invalid number of arguments for function {function_id}")
+                            break
+                return call_type
+       
             # Check if the call is a class attribute call
             elif ctx.getChild(1).getText() == ".":
                 # Get the attribute identifier
@@ -713,14 +727,50 @@ class SemanticAnalyzer(compiscriptVisitor):
                 # Get the identifier
                 identifier = ctx.IDENTIFIER().getText()
                 self.log(f"INFO -> Identifier: {identifier}")
-                # Search for the identifier in the symbol table
-                symbol = self.search_symbol(identifier, Variable)
-                # Check if the symbol is found
-                if symbol is None:
-                    raise Exception(f"Identifier {identifier} not found in symbol table")
- 
-                # The primary is a variable, return the data type of the variable
-                return symbol.data_type
+
+                # First check if the identifier is called inside a function
+                # This means the call is recursive
+                if self.current_function is not None:
+                    if identifier == self.current_function.id:
+                        # If it is recursive, we assume the type of return is any
+                        # because we can't infer the type of the return
+                        return AnyType()
+                    
+                    else: 
+                        # Search for the identifier in the symbol table
+                        symbol = self.search_symbol(identifier, Variable)
+                        # Check if the symbol is found
+                        if symbol is None:
+                            # If the symbol is not found, search for the identifier AS a function
+                            symbol = self.search_symbol(identifier, Function)
+                            # Check if the symbol is found
+                            if symbol is None:
+                                raise Exception(f"Identifier {identifier} not found in symbol table")
+
+                            # The primary is a function, return the return type of the function
+                            return symbol.return_type
+
+                        # The primary is a variable, return the data type of the variable
+                        return symbol.data_type
+                        
+                    
+                else:
+                    # If it isnt a recursive call
+                    # Search for the identifier in the symbol table
+                    symbol = self.search_symbol(identifier, Variable)
+                    # Check if the symbol is found
+                    if symbol is None:
+                        # If the symbol is not found, search for the identifier AS a function
+                        symbol = self.search_symbol(identifier, Function)
+                        # Check if the symbol is found
+                        if symbol is None:
+                            raise Exception(f"Identifier {identifier} not found in symbol table")
+
+                        # The primary is a function, return the return type of the function
+                        return symbol.return_type
+
+                    # The primary is a variable, return the data type of the variable
+                    return symbol.data_type
 
             # Check if the primary is a this keyword
             elif primary_str == "this":
@@ -743,6 +793,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             if ctx.getChild(0).getText() == "super":
                 identifier = ctx.IDENTIFIER().getText()
                 self.log(f"INFO -> Super call: {identifier}")
+                self.super_call = True
 
 
     def visitInstantiation(self, ctx:compiscriptParser.InstantiationContext):
@@ -888,7 +939,7 @@ class SemanticAnalyzer(compiscriptVisitor):
         type = self.visitExpression(ctx.expression())
         # Check if the expression is a boolean type
         if not isinstance(type, BooleanType) and not isinstance(type, AnyType):
-            raise Exception(f"Invalid type for if statement condition got: {type.name}, expected: bool")
+            raise Exception(f"Invalid type for if statement condition got: {type}, expected: bool")
                             
         # Visit the statement node
         self.visitStatement(ctx.statement(0))
@@ -956,7 +1007,7 @@ class SemanticAnalyzer(compiscriptVisitor):
         type = self.visitExpression(ctx.expression())
         # Check if the expression is a boolean type
         if not isinstance(type, BooleanType) and not isinstance(type, AnyType):
-            raise Exception(f"Invalid type for while statement condition got: {type.name}, expected: bool")
+            raise Exception(f"Invalid type for while statement condition got: {type}, expected: bool")
         
         # Visit the statement node
         self.visitStatement(ctx.statement())
@@ -978,8 +1029,13 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if theres a return expression
         if ctx.expression():
-            # Visit the expression node and set the return type of the function
-            self.current_function.returns.appennd(self.visitExpression(ctx.expression()))
+            # Check if the function has multiple return statements
+            if self.current_function.return_count == 0:
+                # Visit the expression node and set the return type of the function
+                return_type = self.visitExpression(ctx.expression())
+                self.current_function.set_return_type(return_type)
+                self.current_function.return_count += 1
+                return return_type
 
         else:
             self.log("INFO -> Return statement without expression")
