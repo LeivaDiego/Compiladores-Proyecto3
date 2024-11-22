@@ -9,7 +9,7 @@ from SemanticAnalyzer.semantic_analyzer import SemanticAnalyzer
 
 def main():
     # Get the input file and create a file stream
-    input_file = 'src/Input/test.cspt'
+    input_file = 'src/Input/if_else.cspt'
     input_stream = FileStream(input_file)
 
     # Create the lexer and use a custom error listener

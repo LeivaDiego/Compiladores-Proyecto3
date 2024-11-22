@@ -7,4 +7,4 @@ var b = 4;
 
 var result = suma(a, b);
 
-print result;
+print result; // Output: 7
