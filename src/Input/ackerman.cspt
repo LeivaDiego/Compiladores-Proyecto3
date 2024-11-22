@@ -1,0 +1,19 @@
+fun ackerman(m, n){
+    if (m == 0){
+        return n + 1;
+    }
+
+    if (m > 0 and n == 0){
+        return ackerman(m - 1, 1);
+    }
+
+    if (m > 0 and n > 0){
+        return ackerman(m - 1, ackerman(m, n - 1));
+    }
+}
+
+// Test de ackerman
+var m = 2;
+var n = 3;
+var result = ackerman(m,n);
+print "ackerman(" + m + "," + n + ") = " + result;
