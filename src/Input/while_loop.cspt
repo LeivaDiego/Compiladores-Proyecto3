@@ -1,6 +1,6 @@
 var edad = 1;
 
 while (edad < 5) {
-  edad = edad + 1;
   print "Edad: " + edad;
+  edad = edad + 1;
 }
