@@ -162,9 +162,6 @@ pane.add(explorer_frame, width=200)
 file_tree = ttk.Treeview(explorer_frame)
 file_tree.pack(fill=tk.BOTH, expand=True)
 
-# Inicialmente, el explorador estará vacío
-# file_tree estará vacío hasta que se seleccione una carpeta
-
 # Vincular la expansión del nodo con la función para cargar su contenido
 file_tree.bind("<<TreeviewOpen>>", on_tree_expand)
 
@@ -175,58 +172,57 @@ file_tree.bind("<Double-1>", on_file_select)
 editor_console_pane = PanedWindow(pane, orient=tk.VERTICAL)
 pane.add(editor_console_pane)
 
-# Crear el editor de código (área de texto con scroll)
-code_editor = scrolledtext.ScrolledText(editor_console_pane, undo=True, wrap=tk.WORD) 
-editor_console_pane.add(code_editor, stretch="always")  
+# Crear el frame para los botones (arriba del editor de texto, fijo)
+button_frame = Frame(editor_console_pane, height=50)
+button_frame.pack_propagate(False)
+editor_console_pane.add(button_frame)
 
-# Crear un frame para los botones de acción
-button_frame = Frame(editor_console_pane)
-editor_console_pane.add(button_frame, stretch="never")
+# Crear contenedor para centrar los botones
+button_container = Frame(button_frame)
+button_container.place(relx=0.5, rely=0.5, anchor="center")
 
-# Crear un frame que contenga los botones y la terminal
+# Cargar la imagen para el botón "Compilar"
+image_path = "image.png"
+img = Image.open(image_path).resize((20, 20), Image.LANCZOS)
+run_icon = ImageTk.PhotoImage(img)
+
+# Crear los botones
+run_button = tk.Button(button_container, text="Compilar", image=run_icon, compound="right", command=run_code)
+run_button.pack(side=tk.LEFT, padx=10)
+
+save_button = tk.Button(button_container, text="Guardar", command=save_file)
+save_button.pack(side=tk.LEFT, padx=10)
+
+# Crear el editor de texto
+code_editor = scrolledtext.ScrolledText(editor_console_pane, undo=True, wrap=tk.WORD)
+editor_console_pane.add(code_editor, stretch="always")
+
+# Crear el frame para la terminal
 terminal_frame = Frame(editor_console_pane)
-editor_console_pane.add(terminal_frame, stretch="always")  
+editor_console_pane.add(terminal_frame, stretch="always")
 
-# Cargar la imagen de la flecha verde para el botón "Compilar"
-image_path = "image.png"  
-img = Image.open(image_path)
-img = img.resize((20, 20), Image.LANCZOS)  
-run_icon = ImageTk.PhotoImage(img)  
+# Crear la terminal
+terminal_output = scrolledtext.ScrolledText(terminal_frame, height=10, state=tk.DISABLED, wrap=tk.WORD, bg="black", fg="white")
+terminal_output.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-# Crear el botón "Compilar"
-run_button = tk.Button(button_frame, text="Compilar  ", image=run_icon, compound="right", command=run_code)  
-run_button.pack(side=tk.LEFT, padx=10, pady=5)
-
-# Crear el botón "Guardar"
-save_button = tk.Button(button_frame, text="Guardar", command=save_file)  
-save_button.pack(side=tk.LEFT, padx=10, pady=5)
-
-# Crear la terminal (área de texto con scroll) para mostrar la salida del código dentro del frame de la terminal
-terminal_output = scrolledtext.ScrolledText(terminal_frame, height=10, state=tk.DISABLED, wrap=tk.WORD, bg="black", fg="white")  
-terminal_output.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)  
-
-# Crear el menú en la barra de menú
+# Crear el menú
 menu_bar = Menu(root)
 root.config(menu=menu_bar)
 
-# Crear el submenú de "Archivo"
+# Submenú Archivo
 file_menu = Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Archivo", menu=file_menu)
-
-# Agregar la opción "Abrir Archivo" en el submenú "Archivo"
 file_menu.add_command(label="Abrir Archivo", command=open_file)
-
-# Agregar la opción "Abrir Carpeta" en el submenú "Archivo"
 file_menu.add_command(label="Abrir Carpeta", command=open_folder)
 
-# Crear el submenú de "Configuraciones"
+# Submenú Configuraciones
 config_menu = Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Configuraciones", menu=config_menu)
 
-# Agregar el submenú de temas dentro de "Configuraciones"
+# Submenú de Tema
 theme_menu = Menu(config_menu, tearoff=0)
 config_menu.add_cascade(label="Tema", menu=theme_menu)
 theme_menu.add_command(label="Claro", command=lambda: set_theme("claro"))
 theme_menu.add_command(label="Oscuro", command=lambda: set_theme("oscuro"))
 
-root.mainloop()  # Inicia el loop principal de tkinter para que la ventana esté en funcionamiento.
+root.mainloop()
