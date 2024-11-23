@@ -9,4 +9,4 @@ fun fibonacci(n) {
 var numero = 10;
 var resultado = fibonacci(numero);
 print "El termino " + numero + " de la serie de Fibonacci es: " + resultado;
-// Output: 34
+// Output: 55
