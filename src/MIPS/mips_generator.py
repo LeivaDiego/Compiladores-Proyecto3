@@ -18,6 +18,8 @@ class MipsGenerator(compiscriptVisitor):
         self.data_section = DataSection()
         self.text_section = TextSection()
         self.current_data: DataStruct = None
+        self.current_block: CodeBlock = None
+
 
     def log(self, message):
         if self.logging:
@@ -29,9 +31,17 @@ class MipsGenerator(compiscriptVisitor):
             file.write('\n\n')
             file.write(str(self.text_section))
 
+    def enter_scope(self, scope_name):
+        self.log(f"INFO -> Entering scope {scope_name}")
+        self.current_block = CodeBlock(scope_name, [])
+        self.text_section.add_code_block(self.current_block)
+
     def visitProgram(self, ctx:compiscriptParser.ProgramContext):
         self.log("VISIT -> Program node")
+        self.enter_scope("main")
         self.visitChildren(ctx)
+        self.text_section.update_code_block(self.current_block)
+        self.current_block.add_exit_code()
 
     def visitPrintStmt(self, ctx:compiscriptParser.PrintStmtContext):
         self.log("VISIT -> PrintStmt node")

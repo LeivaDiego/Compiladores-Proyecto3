@@ -55,16 +55,24 @@ class CodeBlock():
         self.name = name
         self.code = code
 
+    def add_exit_code(self):
+        self.code.append("\n\t# Exit the program")
+        self.code.append("li $v0, 10")
+        self.code.append("syscall")
+
     def __str__(self):
         return f"\t{self.name}:\n" + '\n\t'.join([str(tac) for tac in self.code])
     
 
 class TextSection():
     def __init__(self):
-        self.code_blocks = []
+        self.code_blocks = {}
 
     def add_code_block(self, code_block):
-        self.code_blocks.append(code_block)
+        self.code_blocks[code_block.name] = code_block
+
+    def update_code_block(self, code_block):
+        self.code_blocks[code_block.name] = code_block
 
     def __str__(self):
-        return '.text\n\t'+"\n\t".join([str(code_block) for code_block in self.code_blocks])
+        return '.text\n'+"\n\t".join([str(code_block) for code_block in self.code_blocks.values()])

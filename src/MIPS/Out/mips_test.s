@@ -4,4 +4,8 @@
 	str1: .asciiz " es: "
 
 .text
-	
+	main:
+
+	# Exit the program
+	li $v0, 10
+	syscall
