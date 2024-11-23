@@ -27,46 +27,41 @@ def set_theme(theme):
     if theme == "claro":
         root.config(bg="white")
         code_editor.config(bg="white", fg=light_text_color, insertbackground=light_text_color)
-        terminal_frame.config(bg="white")
         run_button.config(bg="lightgray", fg=light_text_color)
         save_button.config(bg="lightgray", fg=light_text_color)
-        
         # Cambiar estilo del Treeview
         style.configure("Treeview", background="white", foreground=light_text_color, fieldbackground="white")
         style.map('Treeview', background=[('selected', 'lightblue')])
     elif theme == "oscuro":
         root.config(bg=dark_gray)
         code_editor.config(bg=dark_gray, fg=dark_text_color, insertbackground=dark_text_color)
-        terminal_frame.config(bg=dark_gray)
         run_button.config(bg=dark_gray, fg=dark_text_color)
         save_button.config(bg=dark_gray, fg=dark_text_color)
-        
         # Cambiar estilo del Treeview
         style.configure("Treeview", background=dark_gray, foreground=dark_text_color, fieldbackground=dark_gray)
         style.map('Treeview', background=[('selected', 'darkblue')])
 
+
 # Función para ejecutar el código cuando se presiona el botón "Compilar"
 def run_code():
     code = code_editor.get("1.0", tk.END)  # Obtenemos todo el contenido del editor de código.
-    
     # Guardar el código en un archivo temporal
     with open("temp_code.py", "w") as f:
-        f.write(code)  # Escribimos el código en un archivo temporal llamado 'temp_code.py'.
-    
+        f.write(code)
     # Ejecutar el archivo y capturar la salida
     process = subprocess.Popen(
-        ["python", "temp_code.py"],  # Ejecutamos el archivo temporal usando Python.
+        ["python", "temp_code.py"],
         stdout=subprocess.PIPE,  
         stderr=subprocess.PIPE,  
         text=True  
     )
-    output, error = process.communicate()  # Obtenemos la salida y el error de la ejecución.
-    
-    # Mostrar la salida en la "terminal" de la GUI
-    terminal_output.config(state=tk.NORMAL)  
-    terminal_output.delete("1.0", tk.END)  
-    terminal_output.insert(tk.END, output + error)  
-    terminal_output.config(state=tk.DISABLED)  
+    output, error = process.communicate()
+    # Mostrar la salida en la primera terminal
+    terminal_1.config(state=tk.NORMAL)
+    terminal_1.delete("1.0", tk.END)
+    terminal_1.insert(tk.END, output)
+    terminal_1.insert(tk.END, error)
+    terminal_1.config(state=tk.DISABLED)
 
 # Función para guardar el contenido del editor de código en el archivo actual
 def save_file():
@@ -98,9 +93,9 @@ def open_file(file_path=None):
                 current_file_path = file_path  # Guarda la ruta del archivo abierto
                 root.title(f"Compilador - {os.path.basename(file_path)}")  # Actualiza el título con el nombre del archivo
         except Exception as e:
-            terminal_output.config(state=tk.NORMAL)  
-            terminal_output.insert(tk.END, f"Error al abrir el archivo: {e}\n")  
-            terminal_output.config(state=tk.DISABLED)  
+            terminal_2.config(state=tk.NORMAL)  
+            terminal_2.insert(tk.END, f"Error al abrir el archivo: {e}\n")  
+            terminal_2.config(state=tk.DISABLED)  
 
 # Función para abrir una carpeta y poblar el explorador de archivos
 def open_folder():
@@ -150,7 +145,7 @@ def on_file_select(event):
     if os.path.isfile(file_path):
         open_file(file_path)
 
-# Crear un PanedWindow para permitir el cambio de tamaño entre el explorador, el editor de código y la consola
+# Crear un PanedWindow para permitir el cambio de tamaño entre el explorador, el editor de código y las consolas
 pane = PanedWindow(root, orient=tk.HORIZONTAL)
 pane.pack(fill=tk.BOTH, expand=True)
 
@@ -168,7 +163,7 @@ file_tree.bind("<<TreeviewOpen>>", on_tree_expand)
 # Vincular la selección del archivo en el explorador con la apertura del archivo
 file_tree.bind("<Double-1>", on_file_select)
 
-# Crear otro PanedWindow para el editor de código y la consola
+# Crear otro PanedWindow para el editor de código y las consolas
 editor_console_pane = PanedWindow(pane, orient=tk.VERTICAL)
 pane.add(editor_console_pane)
 
@@ -197,13 +192,19 @@ save_button.pack(side=tk.LEFT, padx=10)
 code_editor = scrolledtext.ScrolledText(editor_console_pane, undo=True, wrap=tk.WORD)
 editor_console_pane.add(code_editor, stretch="always")
 
-# Crear el frame para la terminal
-terminal_frame = Frame(editor_console_pane)
-editor_console_pane.add(terminal_frame, stretch="always")
+# Crear el PanedWindow para las consolas verticales
+terminal_pane = PanedWindow(editor_console_pane, orient=tk.HORIZONTAL)
+editor_console_pane.add(terminal_pane, stretch="always")
 
-# Crear la terminal
-terminal_output = scrolledtext.ScrolledText(terminal_frame, height=10, state=tk.DISABLED, wrap=tk.WORD, bg="black", fg="white")
-terminal_output.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+# Crear tres terminales dentro del PanedWindow
+terminal_1 = scrolledtext.ScrolledText(terminal_pane, height=5, state=tk.DISABLED, wrap=tk.WORD, bg="black", fg="white")
+terminal_pane.add(terminal_1, stretch="always")
+
+terminal_2 = scrolledtext.ScrolledText(terminal_pane, height=5, state=tk.DISABLED, wrap=tk.WORD, bg="black", fg="white")
+terminal_pane.add(terminal_2, stretch="always")
+
+terminal_3 = scrolledtext.ScrolledText(terminal_pane, height=5, state=tk.DISABLED, wrap=tk.WORD, bg="black", fg="white")
+terminal_pane.add(terminal_3, stretch="always")
 
 # Crear el menú
 menu_bar = Menu(root)
