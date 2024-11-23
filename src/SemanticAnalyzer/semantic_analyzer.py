@@ -65,7 +65,7 @@ class SemanticAnalyzer(compiscriptVisitor):
         with open("src/SemanticAnalyzer/symbol_table.txt", "w", encoding="utf8") as f:
             f.write(display_table)
 
-        print("SUCCESS -> Symbol table has been written to src/SymbolTable/symbol_table.txt")
+        print("SUCCESS -> Symbol table has been written to src/SymbolTable/symbol_table.txt\n")
 
 
     def enter_scope(self, id):

@@ -1,6 +1,6 @@
 from graphviz import Digraph
 from antlr4 import ParserRuleContext
-import os
+from Utils.file_utils import generate_name
 
 class TreeVisualizer:
     """
@@ -20,7 +20,7 @@ class TreeVisualizer:
         print("Generating Parse Tree...")
         self.graph = Digraph(comment='Parse Tree')
         self.node_count = 0
-        self.name = self.generate_name(file_path)
+        self.name = generate_name(file_path, "parse_tree_")
 
     def add_node(self, label):
         """
@@ -107,22 +107,3 @@ class TreeVisualizer:
         self.graph.render(filename=output_path, format=format, cleanup=cleanup)
 
         print(f"SUCCESS -> Parse tree generated at: {output_path}.{format}\n")
-
-    
-    def generate_name(self, path):
-        """
-        Generates the output file name based on the input file name.
-
-        Args:
-            - path: The path to the input file.
-
-        Returns:
-            - The output file name.
-        """
-        # Extract the file name without extension
-        file_name = os.path.splitext(os.path.basename(path))[0]
-
-        # Append the file name to the output file name
-        output_file_name = f"parse_tree_{file_name}"
-
-        return output_file_name
