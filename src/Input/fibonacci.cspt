@@ -1,0 +1,12 @@
+fun fibonacci(n) {
+  if (n <= 1) {
+    return n;
+  } else {
+    return fibonacci(n - 1) + fibonacci(n - 2);
+  }
+}
+
+var numero = 10;
+var resultado = fibonacci(numero);
+print "El termino " + numero + " de la serie de Fibonacci es: " + resultado;
+// Output: 55

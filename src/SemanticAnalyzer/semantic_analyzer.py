@@ -65,7 +65,7 @@ class SemanticAnalyzer(compiscriptVisitor):
         with open("src/SemanticAnalyzer/symbol_table.txt", "w", encoding="utf8") as f:
             f.write(display_table)
 
-        print("SUCCESS -> Symbol table has been written to src/SymbolTable/symbol_table.txt")
+        print("SUCCESS -> Symbol table has been written to src/SymbolTable/symbol_table.txt\n")
 
 
     def enter_scope(self, id):
@@ -450,9 +450,14 @@ class SemanticAnalyzer(compiscriptVisitor):
                 comparisons.append(self.visitComparison(comparison))
             # Check if all the comparison nodes are of the same type
             # all comparisons must be of the same type
+            type_set = {}
             for comparison in comparisons:
-                if not isinstance(comparison, comparisons[0].__class__) and not isinstance(comparison, AnyType):
-                    raise Exception(f"Invalid type for equality node got: {comparison}, expected: {comparisons[0]}")
+                if not isinstance(comparison, AnyType):
+                    type_set[type(comparison)] = comparison
+                    
+            if len(type_set) > 1:
+                multi_message = " | ".join([f"{value}" for _ , value in type_set.items()])
+                raise Exception(f"Invalid type for equality node, got multiple types: {multi_message}")
                 
             # The equality is a boolean type
             return BooleanType()

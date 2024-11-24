@@ -5,7 +5,7 @@ from ParseTree.parse_tree import TreeVisualizer
 from antlr4.error.ErrorStrategy import DefaultErrorStrategy, ParseCancellationException
 from Utils.custom_exception import ThrowingErrorListener
 from SemanticAnalyzer.semantic_analyzer import SemanticAnalyzer
-
+from MIPS.mips_generator import MipsGenerator
 
 def main():
     # Get the input file and create a file stream
@@ -37,10 +37,14 @@ def main():
                            output_dir='src/ParseTree/Output')
     
     # Create a semantic analyzer and visit the parse tree
-    semantic_analyzer = SemanticAnalyzer(logging=True)
+    semantic_analyzer = SemanticAnalyzer()
     semantic_analyzer.visit(parse_tree)
     semantic_analyzer.display_table()
 
+    # Create a MIPS code generator and visit the parse tree
+    mips_generator = MipsGenerator(input_file, semantic_analyzer.symbol_table, logging=True)
+    mips_generator.visit(parse_tree)
+    mips_generator.generate_file()
 
 if __name__ == '__main__':
     try:

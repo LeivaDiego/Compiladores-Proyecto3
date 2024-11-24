@@ -1,0 +1,9 @@
+var num = 25;
+
+// Output 25 es impar
+if (num % 2 == 0){
+    print num + " es par";
+}
+else{
+    print num + " es impar";
+}

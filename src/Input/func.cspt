@@ -1,0 +1,10 @@
+fun suma(a, b) {
+  return a + b;
+}
+
+var a = 3;
+var b = 4;
+
+var result = suma(a, b);
+
+print result; // Output: 7
