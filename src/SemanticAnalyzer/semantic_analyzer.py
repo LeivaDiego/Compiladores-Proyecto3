@@ -691,7 +691,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                         class_id = ctx.primary().IDENTIFIER().getText()
                         class_instance = self.search_symbol(class_id, Variable)
                         # Search for the class in the symbol table
-                        class_symbol = self.search_symbol(class_instance.data_type.class_ref, Class)
+                        class_symbol = self.search_symbol(class_instance.data_type.class_ref.id, Class)
 
                         if class_symbol is not None:
                             method = class_symbol.search_method(method_id)
@@ -901,7 +901,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             class_symbol.completed = True
 
         # This means variable instantiation is a instance of the class
-        return InstanceType(size=class_symbol.size, class_ref=class_symbol.id)
+        return InstanceType(size=class_symbol.size, class_ref=class_symbol)
 
 
     def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):
