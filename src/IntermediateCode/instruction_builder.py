@@ -1,5 +1,6 @@
 from IntermediateCode.structures import Register
 from SemanticAnalyzer.types import *
+from SemanticAnalyzer.symbols import Symbol, Variable
 
 class InstructionBuilder():
 
@@ -31,7 +32,7 @@ class InstructionBuilder():
             self.instricion_block = self.temporary_context
 
     
-    def add_temp_to_local(self):
+    def push_temp_to_local(self):
         self.local_context.extend(self.temporary_context)
         self.temporary_context.clear()
 
@@ -117,3 +118,53 @@ class InstructionBuilder():
         # Set the register to print
         self.instricion_block.append(f"move $a0, {reg.id}")
         self.instricion_block.append(f"syscall")
+
+
+    def add_data(self, value:DataType, name):
+        # Check the type of the value to add
+        if isinstance(value, NumberType):
+            self.data_section.append(f"{name}: .word {value.value}")
+
+        elif isinstance(value, StringType):
+            self.data_section.append(f"{name}: .asciiz {value.value}")
+
+        elif isinstance(value, BooleanType):
+            boolean_value = 1 if value.value else 0
+            self.data_section.append(f"{name}: .word {boolean_value}")
+
+
+    def add_var(self, symbol:Variable):
+        # We assume the symbol is a variable
+        # Check if the variable has a value
+        if symbol.value is None:
+            # If the variable has no value, add it to the data section
+            # but as a space to reserve memory
+            self.data_section.append(f"{symbol.id}: .space {symbol.type.size}")
+        
+        # Check the type of the variable to add
+        elif isinstance(symbol.type, NumberType):
+            self.data_section.append(f"{symbol.id}: .word {symbol.value}")
+
+        elif isinstance(symbol.type, StringType):
+            self.data_section.append(f"{symbol.id}: .asciiz {symbol.value}")
+
+        elif isinstance(symbol.type, BooleanType):
+            boolean_value = 1 if symbol.value else 0
+            self.data_section.append(f"{symbol.id}: .word {boolean_value}")
+
+
+    def add_instance(self, symbol:Variable):
+        # We assume the symbol is an instance of a class
+        # Get the class name
+        class_name = symbol.id
+        # Get the class attributes
+        attributes = symbol.type.class_ref.attributes
+        
+        # Check if attributes is empty
+        if not attributes:
+            return
+        
+        # For each attribute, add a variable to the data section
+        self.data_section.append(f"{class_name}:")
+        for attribute in attributes:
+            self.add_var(attribute)
