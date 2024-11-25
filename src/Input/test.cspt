@@ -7,5 +7,5 @@ fun factorial(n) {
 }
 
 var numero = 5;
-var resultado = factorial(numero);
+var resultado = factorial(numero,2);
 print "El factorial de " + numero + " es: " + resultado; // 120

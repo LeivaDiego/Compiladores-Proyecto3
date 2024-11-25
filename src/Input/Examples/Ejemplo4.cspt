@@ -1,0 +1,53 @@
+class Busqueda {
+    init() {
+        
+    }
+
+    // Funcion que retorna valores en base al indice
+    obtenerValorEnIndice(indice) {
+        if (indice == 0) {
+            return 1;
+        }
+        if (indice == 1) {
+            return 3;
+        }
+        if (indice == 2) {
+            return 5;
+        }
+        if (indice == 3) {
+            return 7;
+        }
+        if (indice == 4) {
+            return 9;
+        }
+        if (indice == 5) {
+            return 11;
+        }
+        if (indice == 6) {
+            return 13;
+        }
+        return -1;  // Valor no valido, si indice fuera de rango
+    }
+
+    busquedaBinaria(izquierda, derecha, objetivo) {
+        if (derecha >= izquierda) {
+            var medio = (izquierda + derecha) / 2;
+            var valorMedio = this.obtenerValorEnIndice(medio);
+
+            if (valorMedio > objetivo) {
+                // Caso en el que elemento en mitad
+                return this.busquedaBinaria(izquierda, medio - 1, objetivo);
+            }
+
+            // Caso donde elemento en mitad derecha
+            return this.busquedaBinaria(medio+1, derecha, objetivo);
+        }
+        // Elemento no encontrado
+        return -1;
+    }
+}
+
+var buscador = new Busqueda();
+var objetivo = 7;
+var indice = buscador.busquedaBinaria(0, 6, objetivo);
+print "El elemento " + objetivo + " esta en el indice: " + indice;

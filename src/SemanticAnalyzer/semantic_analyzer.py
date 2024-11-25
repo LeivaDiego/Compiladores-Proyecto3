@@ -656,15 +656,29 @@ class SemanticAnalyzer(compiscriptVisitor):
                 if self.in_class_assignment:
                     # Search for the attribute in the current class
                     symbol = self.current_class.search_attribute(attribute)
+                    
                     if symbol is None:
+                        self.log("INFO -> Attribute not found in current class")
+                        self.log("         Searching for method...")
                         # If the attribute is not found in the current class
                         # Try searching for a method
                         symbol = self.current_class.search_method(attribute)
+                        
                         if symbol is None:
-                            raise Exception(f"Attribute {attribute} not found in class {self.current_class.id}")
-                
-                    return symbol.data_type
-                
+                            # Before raising an exception, check if its a recursive call
+                            # If it is, we assume the return type is any
+                            if attribute == self.current_function.id:
+                                return AnyType()
+                            
+                            # At this point the method is not found in the class and is not recursive
+                            raise Exception(f"Method {attribute} not found in class {self.current_class.id}")
+                        
+                        self.log(f"INFO -> Method found: {symbol}")
+                        return symbol.return_type
+                    
+                    else:
+                        return symbol.data_type
+
                 # Check if the call is a class method call and outside a class
                 elif ctx.getChild(3):
                     # Get the method identifier
@@ -850,17 +864,16 @@ class SemanticAnalyzer(compiscriptVisitor):
         
         self.log(f"INFO -> Instantiation for class: {class_id}")
         
-        args = None   # List to store the arguments
+        args = []   # List to store the arguments
 
         # Check if the instantiation has arguments
         if ctx.arguments():
             # Get the arguments
             args = self.visitArguments(ctx.arguments())
 
-
         # Search for the initializer method in the class
         initializer = class_symbol.search_method(f"init")
-
+            
         # Check if the instantiation has proper amount of arguments
         if len(args) != len(initializer.parameters):
             raise Exception(f"Invalid amount of arguments for instantiation of class {class_id}, got: {len(args)}, expected: {len(initializer.parameters)}")
