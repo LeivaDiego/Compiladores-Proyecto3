@@ -10,7 +10,7 @@ from IntermediateCode.ci_generator import CIGenerator
 
 def main():
     # Get the input file and create a file stream
-    input_file = 'src/Input/Examples/Ejemplo6.cspt'
+    input_file = 'src/Input/Examples/Ejemplo5.cspt'
     input_stream = FileStream(input_file)
 
     # Create the lexer and use a custom error listener
@@ -38,7 +38,7 @@ def main():
     #                        output_dir='src/ParseTree/Output')
     
     # Create a semantic analyzer and visit the parse tree
-    semantic_analyzer = SemanticAnalyzer()
+    semantic_analyzer = SemanticAnalyzer(logging=True)
     semantic_analyzer.visit(parse_tree)
     semantic_analyzer.display_table()
 
