@@ -38,14 +38,14 @@ def main():
     #                        output_dir='src/ParseTree/Output')
     
     # Create a semantic analyzer and visit the parse tree
-    semantic_analyzer = SemanticAnalyzer(logging=True)
+    semantic_analyzer = SemanticAnalyzer()
     semantic_analyzer.visit(parse_tree)
     semantic_analyzer.display_table()
 
     # Create a CI Generator and visit the parse tree
-    ci_generator = CIGenerator(semantic_analyzer.symbol_table, logging=True)
-    ci_generator.visit(parse_tree)
-    # TODO: Implement the CI Generator to generate the intermediate code
+    # ci_generator = CIGenerator(semantic_analyzer.symbol_table, logging=True)
+    # ci_generator.visit(parse_tree)
+    # # TODO: Implement the CI Generator to generate the intermediate code
 
 if __name__ == '__main__':
     try:

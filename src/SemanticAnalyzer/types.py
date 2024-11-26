@@ -1,7 +1,8 @@
 class DataType():
-    def __init__(self, name, size):
+    def __init__(self, name, size, value=None):
         self.name = name
         self.size = size
+        self.value = value
 
     def __str__(self):
         return self.name
@@ -16,15 +17,15 @@ class AnyType(DataType):
         super().__init__(name, size)
 
 class NumberType(DataType):
-    def __init__(self, name="num", size=4):
+    def __init__(self, name="num", size=4, value=None):
         super().__init__(name, size)
 
 class StringType(DataType):
-    def __init__(self, name="str", size=4):
+    def __init__(self, name="str", size=4, value=None):
         super().__init__(name, size)
 
 class BooleanType(DataType):
-    def __init__(self, name="bool", size=1):
+    def __init__(self, name="bool", size=1, value=None):
         super().__init__(name, size)
 
 class NilType(DataType):
