@@ -382,8 +382,6 @@ class SemanticAnalyzer(compiscriptVisitor):
                 self.log(f"INFO -> Call for function or class attribute {var_id}")
                 # Get the type of the function or class attribute
                 type = self.visitCall(ctx.call())
-                # reset the multi expression flag
-                self.ssion = False
 
         else:
             # The assignment is a wrapper node, skip it
@@ -397,7 +395,6 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the logic_or isn't a wrapper node
         if ctx.getChildCount() > 1:
-            self.ssion = True
             logic_ands = []
             for logic_and in ctx.logic_and():
                 self.log(f"INFO -> logic_and node: {logic_and.getText()}")
@@ -423,7 +420,6 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the logic_and isn't a wrapper node
         if ctx.getChildCount() > 1:
-            self.ssion = True
             equalities = []
             for equality in ctx.equality():
                 self.log(f"INFO -> equality node: {equality.getText()}")
@@ -448,7 +444,6 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the equality isn't a wrapper node
         if ctx.getChildCount() > 1:
-            self.ssion = True
             comparisons = []
             for comparison in ctx.comparison():
                 self.log(f"INFO -> Comparison node: {comparison.getText()}")
@@ -479,7 +474,6 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the comparison isn't a wrapper node
         if ctx.getChildCount() > 1:
-            self.ssion = True
             terms = []
             # Get the term nodes
             for term in ctx.term():
@@ -506,7 +500,6 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the term isn't a wrapper node
         if ctx.getChildCount() > 1:
-            self.ssion = True
             # Get the operators
             term_operators = []
             minus = False
@@ -561,7 +554,6 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the factor isn't a wrapper node
         if ctx.getChildCount() > 1:
-            self.ssion = True
             # Get the unary nodes
             unaries = []
             for unary in ctx.unary():
@@ -630,7 +622,6 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the call isn't a wrapper node
         if ctx.getChildCount() > 1:
-            self.ssion = True
             
             call_type = self.visitPrimary(ctx.primary())
 
@@ -743,54 +734,27 @@ class SemanticAnalyzer(compiscriptVisitor):
         # Check if the primary is a terminal node
         if ctx.getChildCount() == 1:
             primary_str = ctx.getText()
-
-            # Check if the primary is a value
-            if self.current_variable is not None:
-                # We can assume the primary is the value of the variable
-                # Check if the primary is a number
-                if ctx.NUMBER():
-                    # Get the number
-                    number = ctx.NUMBER().getText()
-                    self.log(f"VALUE -> Number: {number}")
-
-                # Check if the primary is a string
-                elif ctx.STRING():
-                    # Get the string
-                    string = ctx.STRING().getText()
-                    self.log(f"VALUE -> String: {string}")
-
-                # Check if the primary is a boolean
-                elif primary_str in ["true", "false"]:
-                    # Get the boolean
-                    boolean = primary_str
-                    self.log(f"VALUE -> Boolean: {boolean}")
-                    
-                # Check if the primary is a nil
-                elif primary_str == "nil":
-                    # Get the nil
-                    nil = primary_str
-                    self.log(f"VALUE -> Nil: {nil}")
                     
             # Check if the primary is a number
             if ctx.NUMBER():
                 # Get the number
                 number = ctx.NUMBER().getText()
                 self.log(f"INFO -> Number: {number}")
-                return NumberType()
+                return NumberType(value=number)
 
             # Check if the primary is a string
             elif ctx.STRING():
                 # Get the string
                 string = ctx.STRING().getText()
                 self.log(f"INFO -> String: {string}")
-                return StringType()
+                return StringType(value=string)
 
             # Check if the primary is a boolean
             elif primary_str in ["true", "false"]:
                 # Get the boolean
                 boolean = primary_str
                 self.log(f"INFO -> Boolean: {boolean}")
-                return BooleanType()
+                return BooleanType(value=boolean)
 
             # Check if the primary is a nil
             elif primary_str == "nil":

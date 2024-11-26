@@ -287,7 +287,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         # Set current variable
         self.current_variable = var
         # Get the type of the variable
-        type = self.visit(ctx.expression())
+        type = self.visitExpression(ctx.expression())
 
         # Check if the variable is a class instance
         if isinstance(var.data_type, InstanceType):
@@ -323,7 +323,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             
             # Otherwise assign the value to the register directly
             else:
-                temp = self.instruction_generator.load(temp, type.value)
+                self.instruction_generator.load(temp, type.value)
 
             # Save the value to the register
             self.instruction_generator.save(var_register, temp)
@@ -688,10 +688,10 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                     left = right # Set the left expression to the right expression
                 return
             
-            else:
-                # If the equality is a wrapper node, visit the children
-                self.log("INFO -> Wrapper node, skipping...")
-                return self.visitComparison(ctx.comparison(0))
+        else:
+            # If the equality is a wrapper node, visit the children
+            self.log("INFO -> Wrapper node, skipping...")
+            return self.visitComparison(ctx.comparison(0))
             
 
     def visitComparison(self, ctx:compiscriptParser.ComparisonContext):

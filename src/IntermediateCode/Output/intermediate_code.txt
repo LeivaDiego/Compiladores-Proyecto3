@@ -1,10 +1,13 @@
 .data
-numero: .word 0
+numero: .word 5
 
 
 .text
 .globl main     # Entry point of the program
 main:
+load $s0, numero    # Load data into register $s0
+load $t0, 5    # Load data into register $t0
+save $s0, $t0    # save data into register
 # End of program
 li $v0, 10     # Set mode to exit
 syscall       # Exit the program

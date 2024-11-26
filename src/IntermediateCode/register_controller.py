@@ -44,7 +44,7 @@ class RegisterController():
         self.in_use_registers[register.id] = None
     
 
-    def new_temporal(self, value:DataType, symbol=None):
+    def new_temporal(self, value:DataType, symbol=None) -> Register:
         """
         Generates a new temporal register to hold a value
 
@@ -94,7 +94,7 @@ class RegisterController():
         return register
     
 
-    def new_argument(self, value:DataType, symbol=None):
+    def new_argument(self, value:DataType, symbol=None) -> Register:
         """
         Generates a register to hold a value as a parameter,
         similar to the new_temporal method, but for arguments
@@ -141,7 +141,7 @@ class RegisterController():
         self.arg_count = 0
         
 
-    def new_save(self, value:DataType, symbol):
+    def new_save(self, value:DataType, symbol) -> Register:
         """
         Generates a register that will be used to save the values of variables into memory
         similar to the new_temporal method, but for save registers ($s0 to $s7)
@@ -190,7 +190,7 @@ class RegisterController():
         return register
 
 
-    def return_register(self, value:DataType): #set the value of the return register to the value passed   
+    def return_register(self, value:DataType) -> Register: #set the value of the return register to the value passed   
         """
         Sets the return register to the value passed
 
@@ -203,7 +203,7 @@ class RegisterController():
         return Register("$v0", "return", value)
     
 
-    def move(self, destination:Register, source:Register):
+    def move(self, destination:Register, source:Register) -> Register:
         """
         Moves the value of the source register into the destination register
         and frees the source register
@@ -225,7 +225,7 @@ class RegisterController():
         return destination
     
 
-    def get_register_with_symbol(self, symbol:Symbol):
+    def get_register_with_symbol(self, symbol:Symbol) -> Register:
         """
         Searches for the register with the symbol passed,
         and returns the register if found, otherwise None
