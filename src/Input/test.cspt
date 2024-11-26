@@ -1,14 +1,11 @@
-class Persona {
-  init(nombre, edad) {
-    this.nombre = nombre;
-    this.edad = edad;
-    this.color = "rojo";
-  }
-
-  saludar() {
-    print "Hola, mi nombre es " + this.nombre;
-  }
+fun factorial(n) {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n-1);
+    }
 }
 
-var nombre = "Erick";
-var personita = new Persona(nombre, 20);
+var numero = 5;
+var resultado = factorial(numero);
+print "El factorial de " + numero + "es: " + resultado;

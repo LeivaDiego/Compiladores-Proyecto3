@@ -1,43 +1,68 @@
 .data
-nombre: .asciiz "Erick"
-personita:     # Class Instance personita
-    .asciiz "Erick"
-    .word 20
-    .asciiz "rojo"
-STR_0: .asciiz "rojo"
-STR_1: .asciiz "Hola, mi nombre es "
+numero: .word 10
+STR_0: .asciiz "El termino "
+STR_1: .asciiz " de la serie de Fibonacci es: "
 BUFFER: .space 200
-STR_2: .asciiz "Erick"
 
 
 .text
 .globl main     # Entry point of the program
 main:
-load $t0, nombre    # Load data into register $t0
-load $t0, STR_2    # Load data into register $t0
-save $t0, $t0    # save data into register
-load SELF, Persona    # Load data into register SELF
-load PARAM::nombre, $t0    # Load data into register PARAM::nombre
-load PARAM::edad, 20    # Load data into register PARAM::edad
-jal init_persona    # Jump and link to init_persona
+load $t5, numero    # Load data into register $t5
+load $t5, 10    # Load data into register $t5
+save $t5, $t5    # save data into register
+load PARAM::n, $t5    # Load data into register PARAM::n
+jal fibonacci    # Jump and link to fibonacci
+load $t5, resultado    # Load data into register $t5
+load $t5, None    # Load data into register $t5
+save $t5, $t5    # save data into register
+load $t5, STR_0    # Load data into register $t5
+load $t5, numero    # Load data into register $t5
+add $t0, $t5, $t5    # Addition operation
+load $t5, STR_1    # Load data into register $t5
+concat $t5, $t0, $t5    # Concatenation operation
+load $t0, resultado    # Load data into register $t0
+concat $t5, $t5, $t0    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
 # End of program
 li $v0, 10     # Set mode to exit
 syscall       # Exit the program
 
 
-init_persona:
-load $s0, SELF::nombre    # Load data into register $s0
-save $s0, $t0    # save data into register
-save $s0, $t0    # save data into register
-load $t0, SELF::edad    # Load data into register $t0
-save $t0, $t0    # save data into register
-save $t0, $t0    # save data into register
-load $t0, SELF::color    # Load data into register $t0
-load $t0, STR_0    # Load data into register $t0
-save $t0, $t0    # save data into register
+fibonacci:
+load $t0, n    # Load data into register $t0
+load $t1, 1    # Load data into register $t1
+beq $t0, $t1, L0    # Jump to L0 if equals
+slt $t2, $t0, $t1   # Save 1 if $t0 < $t1 else 0
+bne $t2, $zero, L0    # Jump to L0 if not equals
+beq $t2, $zero, L1    # Jump to L1 if equals
+L0:
+load $t0, n    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
 jr $ra    # Return to caller
-saludar_persona:
-load $t0, STR_1    # Load data into register $t0
-load $t0, SELF::nombre    # Load data into register $t0
-concat $t0, $t0, $t0    # Concatenation operation
+j L2    # Jump to L2
+L1:
+load $t0, n    # Load data into register $t0
+load $t1, 1    # Load data into register $t1
+sub $t3, $t0, $t1    # Subtraction operation
+load PARAM::n, num    # Load data into register PARAM::n
+jal fibonacci    # Jump and link to fibonacci
+load $s0, a    # Load data into register $s0
+load $t0, None    # Load data into register $t0
+save $s0, $t0    # save data into register
+load $t0, n    # Load data into register $t0
+load $t1, 2    # Load data into register $t1
+sub $t4, $t0, $t1    # Subtraction operation
+load PARAM::n, num    # Load data into register PARAM::n
+jal fibonacci    # Jump and link to fibonacci
+load $t0, b    # Load data into register $t0
+load $t1, None    # Load data into register $t1
+save $t0, $t1    # save data into register
+load $t0, a    # Load data into register $t0
+load $t1, b    # Load data into register $t1
+add $t5, $t0, $t1    # Addition operation
+move $v0, $t5    # Move value from $t5 to $v0
 jr $ra    # Return to caller
+L2:

@@ -1111,8 +1111,8 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                     args = self.visitArguments(ctx.arguments(0))
 
                     # Get the function ID
-                    if ctx.primary.IDENTIFIER():
-                        function_id = ctx.primary.IDENTIFIER().getText()
+                    if ctx.primary().IDENTIFIER():
+                        function_id = ctx.primary().IDENTIFIER().getText()
                         # Iterate over the arguments and save the values to the registers
                         for symbol in self.symbol_table:
                             # Check if the symbol exists in the symbol table
@@ -1380,3 +1380,147 @@ class IntermediateCodeGenerator(compiscriptVisitor):
 
         # Generate the jump call to the initialization method
         self.instruction_generator.jump_link(f"{initializer.id.lower()}_{class_symbol.id.lower()}")
+
+
+    def visitIfStmt(self, ctx:compiscriptParser.IfStmtContext):
+        self.log("VISIT -> IfStmt node")
+        # Create the labels
+        true_label = self.create_label()  # Create the true label
+        false_label = self.create_label() if ctx.statement(1) else ""   # Create the false label if there is an else statement
+        end_label = self.create_label() # Create the end label
+
+        # Sabe the original destination labels
+        original_inverse = self.current_inverse_call
+        original_jump = self.current_jump_call
+        self.current_jump_call = true_label
+
+        # Check if theres an else statement
+        # If there is, invert the condition
+        self.current_inverse_call = end_label if false_label == "" else false_label
+        self.visit(ctx.expression())    # Visit the expression
+
+        # Add the true label
+        self.instruction_generator.add_label(true_label)
+        self.visit(ctx.statement(0))    # Visit the true statement (block for true condition)
+        self.instruction_generator.jump_to(end_label)  # Jump to the end label
+
+        # If theres a false statemet, add the false label
+        if ctx.statement(1):
+            self.instruction_generator.add_label(false_label)
+            self.visit(ctx.statement(1))    # Visit the false statement (block for false condition)
+
+        # Add the end label
+        self.instruction_generator.add_label(end_label)
+        # Retrive the original destination labels
+        self.current_inverse_call = original_inverse
+        self.current_jump_call = original_jump
+
+
+    
+    def visitWhileStmt(self, ctx:compiscriptParser.WhileStmtContext):
+        self.log("VISIT -> WhileStmt node")
+        # Create the labels
+        start_label = self.create_label()   # Create the start of loop label
+        end_label = self.create_label() # Create the end of loop label
+
+        # Save the original destination labels
+        original_inverse = self.current_inverse_call
+        original_jump = self.current_jump_call
+
+        # Due to the nature of the while loop, just need to jump out of loop
+        # if the condition is not met
+        self.current_inverse_call = end_label
+        self.current_jump_call = ""
+
+        self.instruction_generator.add_label(start_label)  # Add the start label
+        # Visit the expression
+        self.visit(ctx.expression())
+        # Visit the statement
+        self.visit(ctx.statement())
+
+        # Jump back to the start of the loop
+        self.instruction_generator.jump_to(start_label)
+
+        # Add the end label
+        self.instruction_generator.add_label(end_label)
+        # Retrive the original destination labels
+        self.current_inverse_call = original_inverse
+        self.current_jump_call = original_jump
+
+
+    def visitForStmt(self, ctx:compiscriptParser.ForStmtContext):
+        self.log("VISIT -> ForStmt node")
+        # Create the labels
+        start_label = self.create_label()   # Create the start of loop label
+        end_label = self.create_label() # Create the end of loop label
+
+        # Save the original destination labels
+        original_inverse = self.current_inverse_call
+        original_jump = self.current_jump_call
+
+        # Check if theres an initialization statement
+        if ctx.varDecl():
+            self.visit(ctx.varDecl())
+
+        elif ctx.exprStmt():
+            self.visit(ctx.exprStmt())
+
+
+        # Add the start label
+        self.instruction_generator.add_label(start_label)
+
+        # Similar to the while loop, just need to jump out of loop
+        # if the condition is not met
+        self.current_inverse_call = end_label
+        self.current_jump_call = ""
+
+        # Visit the expression
+        self.visit(ctx.expression(0))
+
+        # Return into the original destination labels
+        self.current_inverse_call = original_inverse
+
+        # Visit the statement
+        self.visit(ctx.statement())
+
+        # Check if theres more expressions
+        if ctx.expression(1):
+            self.visit(ctx.expression(1))
+
+        # Jump back to the start of the loop
+        self.instruction_generator.jump_to(start_label)
+
+        # Add the end label
+        self.instruction_generator.add_label(end_label)
+
+        # Retrive the original destination labels
+        self.current_inverse_call = original_inverse
+        self.current_jump_call = original_jump
+
+
+    def visitPrintStmt(self, ctx:compiscriptParser.PrintStmtContext):
+        # Get the expression to print
+        to_print = self.visit(ctx.expression())
+
+        # Check if the expression is a variable
+        if isinstance(to_print, Variable):
+            # Get the register with the symbol
+            tmp = self.register_controller.get_register_with_symbol(to_print)
+            # Check if the register is found
+            if tmp is None:
+                # If the register is not found, create a new register and load the value to it
+                self.instruction_generator.load(tmp, to_print.id)
+                tmp = self.register_controller.new_temporal(to_print.data_type, to_print)
+            # Free the register
+            self.register_controller.free_register(tmp)
+            # Generate the print instruction
+            self.instruction_generator.print_directive(to_print.data_type, self.string_constants, tmp.id)
+        
+        # Check if the expression is a registr
+        elif isinstance(to_print, Register):
+            self.register_controller.free_register(to_print)
+            self.instruction_generator.print_directive(to_print.value, self.string_constants, to_print.id)
+            
+        # Otherwise, the expression is an immediate value
+        else:
+            self.instruction_generator.print_directive(to_print, self.string_constants)
