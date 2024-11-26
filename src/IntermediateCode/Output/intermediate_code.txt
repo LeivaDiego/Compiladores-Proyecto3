@@ -1,0 +1,12 @@
+.data
+numero: .word 0
+
+
+.text
+.globl main     # Entry point of the program
+main:
+# End of program
+li $v0, 10     # Set mode to exit
+syscall       # Exit the program
+
+

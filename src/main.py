@@ -5,7 +5,7 @@ from ParseTree.parse_tree import TreeVisualizer
 from antlr4.error.ErrorStrategy import DefaultErrorStrategy, ParseCancellationException
 from Utils.custom_exception import ThrowingErrorListener
 from SemanticAnalyzer.semantic_analyzer import SemanticAnalyzer
-from IntermediateCode.ci_generator import CIGenerator
+from IntermediateCode.ci_generator import IntermediateCodeGenerator
 
 
 def main():
@@ -43,9 +43,9 @@ def main():
     semantic_analyzer.display_table()
 
     # Create a CI Generator and visit the parse tree
-    # ci_generator = CIGenerator(semantic_analyzer.symbol_table, logging=True)
-    # ci_generator.visit(parse_tree)
-    # # TODO: Implement the CI Generator to generate the intermediate code
+    ci_generator = IntermediateCodeGenerator(semantic_analyzer.symbol_table)
+    ci_generator.visit(parse_tree)
+    ci_generator.generate_intermediate_code()
 
 if __name__ == '__main__':
     try:
