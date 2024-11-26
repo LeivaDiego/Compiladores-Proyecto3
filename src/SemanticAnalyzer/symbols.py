@@ -22,6 +22,7 @@ class Variable(Symbol):
     """
     def __init__(self, id, type="var"):
         super().__init__(id, type)
+        self.value = None                   # The value of the variable
 
     def set_type(self, data_type: DataType):
         """
@@ -29,6 +30,12 @@ class Variable(Symbol):
         """
         self.data_type = data_type
         self.size = data_type.size
+
+    def set_value(self, value):
+        """
+        Set the value of the variable
+        """
+        self.value = value
 
     def __str__(self):
         return f"{self.type}: {self.id} | type: {self.data_type} | size: {self.size} | scope: {self.scope} | offset: {self.offset}"

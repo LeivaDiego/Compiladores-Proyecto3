@@ -32,6 +32,8 @@ class SemanticAnalyzer(compiscriptVisitor):
         self.in_print = False                    # Flag to check if we are in a print statement
         self.super_call = False                  # Flag to check if we are in a super call
 
+        self.multi_expression = False            # Flag to check if we are in a multi expression
+
     def log(self, message):
         if self.logging:
             print(f"    {message}")
@@ -335,6 +337,8 @@ class SemanticAnalyzer(compiscriptVisitor):
     def visitExpression(self, ctx:compiscriptParser.ExpressionContext):
         self.log("VISIT -> Expression node")
         self.log(f"INFO -> Expression: {ctx.getText()}")
+        # Reset the multi expression flag
+        self.multi_expression = False
         # Check if the expression is an assignment
         if ctx.assignment():
             return self.visitAssignment(ctx.assignment())
@@ -351,6 +355,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the assignment isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             # Get the variable id
             var_id = ctx.IDENTIFIER().getText()
             # Check if we are inside a class
@@ -367,7 +372,6 @@ class SemanticAnalyzer(compiscriptVisitor):
                 self.current_class.attributes.append(attribute)
                 # Add the attribute to the symbol table
                 self.add_symbol(attribute)
-
             
             # Check if the assignment is for a class attribute
             elif ctx.call() and self.current_class is not None:
@@ -381,7 +385,8 @@ class SemanticAnalyzer(compiscriptVisitor):
                 self.log(f"INFO -> Call for function or class attribute {var_id}")
                 # Get the type of the function or class attribute
                 type = self.visitCall(ctx.call())
-
+                # reset the multi expression flag
+                self.multi_expression = False
 
         else:
             # The assignment is a wrapper node, skip it
@@ -395,6 +400,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the logic_or isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             logic_ands = []
             for logic_and in ctx.logic_and():
                 self.log(f"INFO -> logic_and node: {logic_and.getText()}")
@@ -404,7 +410,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             for logic_and in logic_ands:
                 if not isinstance(logic_and, BooleanType) and not isinstance(logic_and, AnyType):
                     raise Exception(f"Invalid type for logic_or node got: {logic_and}, expected: bool")
-            
+
             # The logic_or is a boolean type
             return BooleanType()
         
@@ -420,6 +426,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the logic_and isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             equalities = []
             for equality in ctx.equality():
                 self.log(f"INFO -> equality node: {equality.getText()}")
@@ -444,6 +451,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the equality isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             comparisons = []
             for comparison in ctx.comparison():
                 self.log(f"INFO -> Comparison node: {comparison.getText()}")
@@ -458,7 +466,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             if len(type_set) > 1:
                 multi_message = " | ".join([f"{value}" for _ , value in type_set.items()])
                 raise Exception(f"Invalid type for equality node, got multiple types: {multi_message}")
-                
+            
             # The equality is a boolean type
             return BooleanType()
 
@@ -474,6 +482,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the comparison isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             terms = []
             # Get the term nodes
             for term in ctx.term():
@@ -484,7 +493,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             for term in terms:
                 if not isinstance(term, NumberType) and not isinstance(term, AnyType):
                     raise Exception(f"Invalid type for comparison node got: {term}, expected: num")
-                
+
             # The comparison is a boolean type
             return BooleanType()
 
@@ -500,6 +509,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the term isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             # Get the operators
             term_operators = []
             minus = False
@@ -554,6 +564,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the factor isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             # Get the unary nodes
             unaries = []
             for unary in ctx.unary():
@@ -622,6 +633,7 @@ class SemanticAnalyzer(compiscriptVisitor):
 
         # Check if the call isn't a wrapper node
         if ctx.getChildCount() > 1:
+            self.multi_expression = True
             
             call_type = self.visitPrimary(ctx.primary())
 
@@ -656,15 +668,29 @@ class SemanticAnalyzer(compiscriptVisitor):
                 if self.in_class_assignment:
                     # Search for the attribute in the current class
                     symbol = self.current_class.search_attribute(attribute)
+                    
                     if symbol is None:
+                        self.log("INFO -> Attribute not found in current class")
+                        self.log("         Searching for method...")
                         # If the attribute is not found in the current class
                         # Try searching for a method
                         symbol = self.current_class.search_method(attribute)
+                        
                         if symbol is None:
-                            raise Exception(f"Attribute {attribute} not found in class {self.current_class.id}")
-                
-                    return symbol.data_type
-                
+                            # Before raising an exception, check if its a recursive call
+                            # If it is, we assume the return type is any
+                            if attribute == self.current_function.id:
+                                return AnyType()
+                            
+                            # At this point the method is not found in the class and is not recursive
+                            raise Exception(f"Method {attribute} not found in class {self.current_class.id}")
+                        
+                        self.log(f"INFO -> Method found: {symbol}")
+                        return symbol.return_type
+                    
+                    else:
+                        return symbol.data_type
+
                 # Check if the call is a class method call and outside a class
                 elif ctx.getChild(3):
                     # Get the method identifier
@@ -677,7 +703,7 @@ class SemanticAnalyzer(compiscriptVisitor):
                         class_id = ctx.primary().IDENTIFIER().getText()
                         class_instance = self.search_symbol(class_id, Variable)
                         # Search for the class in the symbol table
-                        class_symbol = self.search_symbol(class_instance.data_type.class_ref, Class)
+                        class_symbol = self.search_symbol(class_instance.data_type.class_ref.id, Class)
 
                         if class_symbol is not None:
                             method = class_symbol.search_method(method_id)
@@ -721,6 +747,37 @@ class SemanticAnalyzer(compiscriptVisitor):
         if ctx.getChildCount() == 1:
             primary_str = ctx.getText()
 
+            # Check if the primary is a value
+            if self.current_variable is not None and not self.multi_expression:
+                # We can assume the primary is the value of the variable
+                # Check if the primary is a number
+                if ctx.NUMBER():
+                    # Get the number
+                    number = ctx.NUMBER().getText()
+                    self.log(f"VALUE -> Number: {number}")
+                    self.current_variable.set_value(number)
+
+                # Check if the primary is a string
+                elif ctx.STRING():
+                    # Get the string
+                    string = ctx.STRING().getText()
+                    self.log(f"VALUE -> String: {string}")
+                    self.current_variable.set_value(string)
+
+                # Check if the primary is a boolean
+                elif primary_str in ["true", "false"]:
+                    # Get the boolean
+                    boolean = primary_str
+                    self.log(f"VALUE -> Boolean: {boolean}")
+                    self.current_variable.set_value(boolean)
+                    
+                # Check if the primary is a nil
+                elif primary_str == "nil":
+                    # Get the nil
+                    nil = primary_str
+                    self.log(f"VALUE -> Nil: {nil}")
+                    self.current_variable.set_value(nil)
+                    
             # Check if the primary is a number
             if ctx.NUMBER():
                 # Get the number
@@ -850,17 +907,16 @@ class SemanticAnalyzer(compiscriptVisitor):
         
         self.log(f"INFO -> Instantiation for class: {class_id}")
         
-        args = None   # List to store the arguments
+        args = []   # List to store the arguments
 
         # Check if the instantiation has arguments
         if ctx.arguments():
             # Get the arguments
             args = self.visitArguments(ctx.arguments())
 
-
         # Search for the initializer method in the class
         initializer = class_symbol.search_method(f"init")
-
+            
         # Check if the instantiation has proper amount of arguments
         if len(args) != len(initializer.parameters):
             raise Exception(f"Invalid amount of arguments for instantiation of class {class_id}, got: {len(args)}, expected: {len(initializer.parameters)}")
@@ -888,7 +944,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             class_symbol.completed = True
 
         # This means variable instantiation is a instance of the class
-        return InstanceType(size=class_symbol.size, class_ref=class_symbol.id)
+        return InstanceType(size=class_symbol.size, class_ref=class_symbol)
 
 
     def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):
