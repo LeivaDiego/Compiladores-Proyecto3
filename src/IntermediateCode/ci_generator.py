@@ -7,7 +7,6 @@ from SemanticAnalyzer.symbols import *
 from SemanticAnalyzer.types import *
 
 
-
 class IntermediateCodeGenerator(compiscriptVisitor):
     """
     Class that generates the intermediate code for the CompiScript language.
@@ -118,6 +117,17 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         return None
     
 
+    def search_parameter(self, id, function):
+        # Iterate over the symbol table in reversed order
+        for symbol in reversed(self.symbol_table):
+            # Check if the symbol is in the valid scope, has the correct type (param)
+            if symbol.id == id and isinstance(symbol, Variable) and symbol.type == "param" and symbol.scope.id == function:
+                return symbol
+
+        # At this point, the parameter was not found
+        return None
+
+
     def create_label(self):
         label = f"L{self.label_counter}"
         self.label_counter += 1
@@ -150,6 +160,124 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             self.visitStatement(ctx.statement())
 
 
+    def visitFunction(self, ctx:compiscriptParser.FunctionContext):
+        self.log("VISIT -> Function node")
+        # Get the function id
+        fun_id = ctx.IDENTIFIER().getText()
+
+        # Check if the function is a constructor for a class (init)
+        if fun_id == "init" and self.current_class is not None:
+            self.log(f"INFO -> This function is a constructor for class: {self.current_class.id}")
+            self.in_init = True  # Set the init flag to True
+            self.method_flag = True  # Set the method flag to True
+        
+        elif self.current_class is not None and self.in_class_assignment:
+            self.log(f"INFO -> This function is a method for class: {self.current_class.id}")
+            self.method_flag = True  # Set the method flag to True
+
+        # Get the function name with the class id as prefix
+        fun_id = f"{fun_id.lower()}_{self.current_class.id.lower()}" if self.current_class is not None else fun_id.lower()
+
+        # Create a new function object
+        self.current_function = Function(fun_id)
+
+        # Switch context to the function (local scope)
+        self.instruction_generator.switch_context(1)
+        self.instruction_generator.add_label(fun_id)  # Add the function label to the instruction set
+
+        # Visit the function children
+        self.visit(ctx.block())
+
+        # Check if the function has a return statement
+        if not self.has_return:
+            # If it doesnt, add a return statement
+            self.instruction_generator.jump_return()
+
+        self.has_return = False  # Reset the return flag
+
+        # Switch context back to the global scope
+        self.instruction_generator.switch_context(0)
+
+
+    def visitArguments(self, ctx:compiscriptParser.ArgumentsContext):
+        self.log("VISIT -> Arguments node")
+        # Initialize the arguments list
+        arguments = []
+        for expression in ctx.expression():
+            # Iterate over the arguments and get their values
+            self.log(f"INFO -> Expression in arguments: {expression.getText()}")
+            arguments.append(self.visitExpression(expression))
+
+        return arguments
+    
+
+    def visitParameters(self, ctx:compiscriptParser.ParametersContext):
+        self.log("VISIT -> Parameters node")
+        # Get the parameters identifiers
+        for param in ctx.IDENTIFIER():
+            # Get the parameter identifier
+            param_id = param.getText()
+            self.log(f"INFO -> Parameter: {param_id}")
+            # Create a new variable symbol for the parameter
+            parameter = self.search_parameter(param, self.current_function.id)
+            # Add the parameter to the current function
+            parameter.scope.id = self.current_function.id
+
+
+    def visitReturnStmt(self, ctx:compiscriptParser.ReturnStmtContext):
+        self.log("VISIT -> ReturnStmt node")
+        # Set the return flag to True
+        self.has_return = True
+
+        # Get the value of the return statement
+        val = self.visit(ctx.expression())
+
+        # Check if the value is a variable
+        if isinstance(val, Variable):
+            # If it is, we need to load the value to a register
+            tmp = self.register_controller.get_register_with_symbol(val)
+            if tmp is None:
+                # If the register is not found, create a new register and load the value to it
+                tmp = self.register_controller.new_temporal(val)
+                self.instruction_generator.load(tmp, val.id)
+            # Generate the return instruction
+            returner = self.register_controller.return_register(val.data_type)
+            # Move the value to the return register
+            self.instruction_generator.move(returner, tmp)
+            # Free the register
+            self.register_controller.free_register(tmp)
+            # Add the return instruction to the instruction set
+            self.instruction_generator.jump_return()
+            return returner
+        
+        # If the value is a register, we need to move the value to the return register
+        elif isinstance(val, Register):
+            returner = self.register_controller.return_register(val.value)
+            self.register_controller.move(returner, val)    # Move the value to the return register
+            self.instruction_generator.move(returner, val)  # Move the value to the return register
+            self.register_controller.free_register(val)     # Free the register
+            self.instruction_generator.jump_return()        # Add the return instruction to the instruction set
+            return returner
+        
+        else:
+            # If the value is not a variable, it is an immediate value
+            temp = self.register_controller.new_temporal(val)
+            # Check if the value is a string
+            if isinstance(val, StringType):
+                # If it is, load the value from the string constants buffer
+                self.instruction_generator.load(temp, self.string_constants.get(val.value, "BUFFER"))
+            else:
+                # Otherwise, load the value to the register
+                self.instruction_generator.load(temp, val.value)
+
+            returner = self.register_controller.return_register(val.value)
+            self.register_controller.move(returner, temp)   # Move the value to the return register
+            self.instruction_generator.move(returner, temp) # Move the value to the return register
+            self.register_controller.free_register(temp)    # Free the register
+            self.instruction_generator.jump_return()        # Add the return instruction to the instruction set
+            return returner
+
+
     def visitVarDecl(self, ctx:compiscriptParser.VarDeclContext):
         self.log("VISIT -> VarDecl node")
         # Get the variable id
@@ -159,7 +287,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         # Set current variable
         self.current_variable = var
         # Get the type of the variable
-        var_type = self.visitExpression(ctx.expression())
+        type = self.visit(ctx.expression())
 
         # Check if the variable is a class instance
         if isinstance(var.data_type, InstanceType):
@@ -181,21 +309,21 @@ class IntermediateCodeGenerator(compiscriptVisitor):
 
         # Check if the variable is a Register
         # Get the value of the variable and save it directly to the register
-        if isinstance(var_type, Register):
-            self.instruction_generator.save(var_register, var_type) # Save the value to the register
-            self.register_controller.free_register(var_type)    # Free the register
+        if isinstance(type, Register):
+            self.instruction_generator.save(var_register, type) # Save the value to the register
+            self.register_controller.free_register(type)    # Free the register
         # If it is not a register, it is a constant
         else:
-            temp = self.register_controller.new_temporal(var_type)  # Create a temporal register
+            temp = self.register_controller.new_temporal(type)  # Create a temporal register
             # Check if the variable is a string
-            if isinstance(var_type, StringType):
+            if isinstance(type, StringType):
                 # If it is, and the string is not in the string constants,
                 # its in the buffer, so we need to load it to a register
-                self.instruction_generator.load(temp, self.string_constants.get(var_type.value, "BUFFER"))
+                self.instruction_generator.load(temp, self.string_constants.get(type.value, "BUFFER"))
             
             # Otherwise assign the value to the register directly
             else:
-                temp = self.instruction_generator.load(temp, var_type.value)
+                temp = self.instruction_generator.load(temp, type.value)
 
             # Save the value to the register
             self.instruction_generator.save(var_register, temp)
@@ -214,13 +342,13 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         if ctx.getChildCount() > 1:
             # Get the variable id
             var_id = ctx.IDENTIFIER().getText()
-            var_type = None # Initialize the variable type
+            type = None # Initialize the variable type
 
             # Check if we are in a class constructor context
             if self.in_init and self.current_class is not None and ctx.call():
                 # This means we are initializing a class attribute
                 # Search for it and use the offset of the class attribute to access it
-                var_type = self.visitAssignment(ctx.assignment())   # Get the value of the assignment
+                type = self.visitAssignment(ctx.assignment())   # Get the value of the assignment
                 var:Variable = self.current_class.search_attribute(var_id)   # Search for the attribute
                 var.id = f"SELF::{var.id}" # Add the SELF prefix to the id
 
@@ -239,27 +367,27 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 
                 # If the value is a register, save it directly, 
                 # otherwise load it to a register and free up the register that was holding the value
-                if isinstance(var_type, Register):
-                    self.instruction_generator.save(var_register, var_type) # Save the value to the register
-                    self.register_controller.free_register(var_type)    # Free the register
+                if isinstance(type, Register):
+                    self.instruction_generator.save(var_register, type) # Save the value to the register
+                    self.register_controller.free_register(type)    # Free the register
                 
                 else:
                     # Create a temporal register
-                    temp = self.register_controller.new_temporal(var_type)
+                    temp = self.register_controller.new_temporal(type)
                     # Check if the type is a variable and the data is anyType
                     # This means its a parameter, so we need to load the value to a register
-                    if isinstance(var_type, Variable) and isinstance(var_type.data_type, AnyType):
-                        self.instruction_generator.load(temp, f"PARAM::{var_type.id.replace('SELF::', '')}")
+                    if isinstance(type, Variable) and isinstance(type.data_type, AnyType):
+                        self.instruction_generator.load(temp, f"PARAM::{type.id.replace('SELF::', '')}")
 
                     # Otherwise, if isnt a anyType, assign the value to the register directly
-                    elif isinstance(var_type, Variable):
+                    elif isinstance(type, Variable):
                         # Search for the register holding the value
-                        tmp = self.register_controller.get_register_with_symbol(var_type)
+                        tmp = self.register_controller.get_register_with_symbol(type)
                         # Check if the register is None
                         if tmp is None:
                             # If it is, create a new register and load the value to it
-                            tmp = self.register_controller.new_temporal(var_type)
-                            self.instruction_generator.load(tmp, var_type.id)
+                            tmp = self.register_controller.new_temporal(type)
+                            self.instruction_generator.load(tmp, type.id)
 
                         # Save the value to the register
                         self.instruction_generator.save(var_register, tmp)
@@ -268,12 +396,12 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                         
                     # If its a string and not in the string constants, 
                     # its in the buffer, so we need to load it to a register
-                    elif isinstance(var_type, StringType):
-                        self.instruction_generator.load(temp, self.string_constants.get(var_type.value, "BUFFER"))
+                    elif isinstance(type, StringType):
+                        self.instruction_generator.load(temp, self.string_constants.get(type.value, "BUFFER"))
                     
                     # Otherwise, assign the value to the register directly
                     else:
-                        self.instruction_generator.load(temp, var_type.value)
+                        self.instruction_generator.load(temp, type.value)
 
                     # Save the value to the register
                     self.instruction_generator.save(var_register, temp)
@@ -287,7 +415,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             elif ctx.call() and self.current_class is not None:
                 # This means we are assigning a value to a class attribute
                 # Search for the attribute in the class and use the offset to access it
-                var_type = self.visitAssignment(ctx.assignment())
+                type = self.visitAssignment(ctx.assignment())
                 var:Variable = self.current_class.search_attribute(var_id)
                 var.id = f"SELF::{var.id}" # Add the SELF prefix to the id
 
@@ -305,26 +433,26 @@ class IntermediateCodeGenerator(compiscriptVisitor):
 
                 # If the value is a register, save it directly,
                 # otherwise load it to a register and free up the register that was holding the value
-                if isinstance(var_type, Register):
-                    self.instruction_generator.save(var_register, var_type)
-                    self.register_controller.free_register(var_type)
+                if isinstance(type, Register):
+                    self.instruction_generator.save(var_register, type)
+                    self.register_controller.free_register(type)
 
                 else:
                     # Create a temporal register
-                    temp = self.register_controller.new_temporal(var_type)
+                    temp = self.register_controller.new_temporal(type)
                     # Check if the type is a variable and the data is anyType
                     # This means its a parameter, so we need to load the value to a register
-                    if isinstance(var_type, Variable) and isinstance(var_type.data_type, AnyType):
-                        self.instruction_generator.load(temp, f"PARAM::{var_type.id.replace('SELF::', '')}")
+                    if isinstance(type, Variable) and isinstance(type.data_type, AnyType):
+                        self.instruction_generator.load(temp, f"PARAM::{type.id.replace('SELF::', '')}")
                     
                     # Otherwise, if isnt a anyType, and its a string, load it to a register from 
                     # the string constants buffer
-                    elif isinstance(var_type, StringType):
-                        self.instruction_generator.load(temp, self.string_constants.get(var_type.value, "BUFFER"))
+                    elif isinstance(type, StringType):
+                        self.instruction_generator.load(temp, self.string_constants.get(type.value, "BUFFER"))
                     
                     else:
                         # Load the value to a register
-                        self.instruction_generator.load(temp, var_type.value)
+                        self.instruction_generator.load(temp, type.value)
 
                     # Save the value to the register
                     self.instruction_generator.save(var_register, temp)
@@ -339,11 +467,11 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 # This means we are calling a function or a class instance attribute
                 self.log(f"INFO -> Call for function or class instance attribute {var_id}")
                 # Get the value from call
-                var_type = self.visitCall(ctx.call())
+                type = self.visitCall(ctx.call())
             # If we are not in a class assignment context and there is no call
             # We are assigning a value to a variable
             else:
-                var_type = self.visitAssignment(ctx.assignment())
+                type = self.visit(ctx.assignment())
                 var:Variable = self.search_symbol(var_id, Variable)
 
                 # If its a class instance, we handle the instantiation in the instantiation node
@@ -360,20 +488,20 @@ class IntermediateCodeGenerator(compiscriptVisitor):
 
                 # If the value is a register, save it directly,
                 # otherwise load it to a register and free up the register that was holding the value
-                if isinstance(var_type, Register):
-                    self.instruction_generator.save(var_register, var_type)
-                    self.register_controller.free_register(var_type)
+                if isinstance(type, Register):
+                    self.instruction_generator.save(var_register, type)
+                    self.register_controller.free_register(type)
 
                 else:
                     # Create a temporal register
-                    temp = self.register_controller.new_temporal(var_type)
+                    temp = self.register_controller.new_temporal(type)
                     # Check if the value is a string and not in the string constants
                     # This means its in the buffer, so we need to load it to a register
-                    if isinstance(var_type, StringType):
-                        self.instruction_generator.load(temp, self.string_constants.get(var_type.value, "BUFFER"))
+                    if isinstance(type, StringType):
+                        self.instruction_generator.load(temp, self.string_constants.get(type.value, "BUFFER"))
                     else:
                         # Load the value to a register
-                        self.instruction_generator.load(temp, var_type.value)
+                        self.instruction_generator.load(temp, type.value)
 
                     # Save the value to the register
                     self.instruction_generator.save(var_register, temp)
@@ -399,7 +527,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Iterate over the children
             for i in range(0, len(ctx.logic_and())-1):
                 # Visit the logic_and node for the current child
-                expression = self.visitLogic_and(ctx.logic_and(i))
+                expression = self.visit(ctx.logic_and(i))
                 # Free the registers of the comparison
                 if isinstance(expression, Register):
                     self.register_controller.free_register(expression)
@@ -407,7 +535,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Visit the last child with the inverse tag and apply it,
             # then apply the jump call when condition was not met
             self.current_inverse_call = inverse_label
-            expression = self.visitLogic_and(ctx.logic_and(i))
+            expression = self.visit(ctx.logic_and(i))
 
             # Free the registers of the comparison
             if isinstance(expression, Register):
@@ -431,7 +559,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 next_label = self.create_label()
                 self.current_jump_call = next_label
                 # Visit the equality node for the current child
-                expression = self.visitEquality(ctx.equality(i))
+                expression = self.visit(ctx.equality(i))
                 # Free the registers of the comparison
                 if isinstance(expression, Register):
                     self.register_controller.free_register(expression)
@@ -442,7 +570,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Visit the last child, and apply the jump call to the next comparison
             # only if the contition is met
             self.current_jump_call = original_jump
-            expression = self.visitEquality(ctx.equality(i))
+            expression = self.visit(ctx.equality(i))
 
             # Free the registers of the comparison
             if isinstance(expression, Register):
@@ -464,7 +592,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Iterate over the rest of the children
             for i in range(1, len(ctx.comparison())):
                 # Get the right expression
-                right = self.visitComparison(ctx.comparison(i))
+                right = self.visit(ctx.comparison(i))
                 # Get the operator (every second child)
                 operator = ctx.getChild(2 * i - 1).getText() #-> "==" | "!="
                 # Check if the left expression is a register
@@ -555,8 +683,8 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                             self.instruction_generator.branch_equals(left, right, self.current_inverse_call)
 
                     # Free the registers
-                    self.register_controller.free_register(left)
                     self.register_controller.free_register(right)
+                    self.register_controller.free_register(left)
                     left = right # Set the left expression to the right expression
                 return
             
@@ -571,7 +699,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         # Check if the comparison is a wrapper node
         if ctx.getChildCount() > 1:
             # Get the left expression
-            left = self.visitTerm(ctx.term(0))
+            left = self.visit(ctx.getChild(0))
 
             # Iterate over the rest of the children
             for i in range(1, len(ctx.term())):
@@ -635,7 +763,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                     tmp = self.register_controller.get_register_with_symbol(right)
                     if tmp is None:
                         # If the register is not found, create a new register and load the value to it
-                        tmp = self.register_controller.new_temporal(right.data_type, right)
+                        tmp = self.register_controller.new_temporal(right.data_type, left)
                         self.instruction_generator.load(tmp, right.id)
                     right = tmp
 
@@ -709,8 +837,8 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                         self.instruction_generator.branch_equals(temp, self.register_controller.zero, self.current_inverse_call)
 
                 # Free the registers
-                self.register_controller.free_register(left)
                 self.register_controller.free_register(right)
+                self.register_controller.free_register(left)
                 left = right # Set the left expression to the temporal register
             return
         
@@ -729,7 +857,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Iterate over the rest of the children
             for i in range(1, len(ctx.factor())):
                 # Get the right expression
-                right = self.visitFactor(ctx.factor(i))
+                right = self.visit(ctx.factor(i))
                 # Get the operator (every second child)
                 operator = ctx.getChild(2 * i - 1).getText() #-> "+" | "-"
 
@@ -808,22 +936,22 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 if operator == "+":
                     # Concatenate or add operator
                     # Check if the expressions are strings, this means we need to concatenate them
-                    if isinstance(left, StringType) and isinstance(right, StringType):
-                        temp = self.register_controller.new_temporal(StringType(value=f"{left.value}{right.value}"))
-                        self.instruction_generator.load(temp, self.string_constants.get(left.value, "BUFFER"))
+                    if isinstance(left.value, StringType) or isinstance(right.value, StringType):
+                        temp = self.register_controller.new_temporal(StringType(value=str(left)+str(right)))
+                        self.instruction_generator.concat(temp, left, right)
 
                     else:
-                        temp = self.register_controller.new_temporal(left.value)
+                        temp = self.register_controller.new_temporal(right.value)
                         self.instruction_generator.add(temp, left, right)
 
                 else:
                     # Subtract operator
-                    temp = self.register_controller.new_temporal(left.value)
+                    temp = self.register_controller.new_temporal(right.value)
                     self.instruction_generator.sub(temp, left, right)
 
                 # Free the registers
-                self.register_controller.free_register(left)
                 self.register_controller.free_register(right)
+                self.register_controller.free_register(left)
                 left = temp # Set the left expression to the temporal register
             return left
         
@@ -842,7 +970,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Iterate over the rest of the children
             for i in range(1, len(ctx.unary())):
                 # Get the right expression
-                right = self.visitUnary(ctx.unary(i))
+                right = self.visit(ctx.unary(i))
                 # Get the operator (every second child)
                 operator = ctx.getChild(2 * i - 1).getText() #-> "*" | "/" | "%"
 
@@ -932,8 +1060,8 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                     self.instruction_generator.mod(temp, left, right)
 
                 # Free the registers
-                self.register_controller.free_register(left)
                 self.register_controller.free_register(right)
+                self.register_controller.free_register(left)
                 left = temp # Set the left expression to the temporal register
 
             return left
@@ -942,6 +1070,138 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # If the factor is a wrapper node, visit the children
             self.log("INFO -> Wrapper node, skipping...")
             return self.visitUnary(ctx.unary(0))
+
+
+    def visitUnary(self, ctx:compiscriptParser.UnaryContext):
+        return super().visitUnary(ctx)
+
+
+    def visitCall(self, ctx:compiscriptParser.CallContext):
+        self.log("VISIT -> Call node")
+        # Check if the call isnt a wrapper node
+        if ctx.getChildCount() > 1:
+            # Get the call type
+            call_type = self.visitPrimary(ctx.primary())
+
+            # Check if the call is a plain function call
+            if ctx.getChild(1).getText() == "(":
+                # Check if the function call has arguments
+                if ctx.arguments():
+                    args = self.visitArguments(ctx.arguments(0))
+
+                    # Get the function ID
+                    if ctx.primary.IDENTIFIER():
+                        function_id = ctx.primary.IDENTIFIER().getText()
+                        # Iterate over the arguments and save the values to the registers
+                        for symbol in self.symbol_table:
+                            # Check if the symbol exists in the symbol table
+                            if symbol.id == function_id and isinstance(symbol, Function):
+                                # Check if the arguments count is the same as the function parameters count
+                                for i in range(0, len(symbol.parameters)):
+                                    if isinstance(args[i], Variable):
+                                        reference = self.register_controller.get_register_with_symbol(args[i])
+                                        if reference is None:
+                                            # If the register is not found, create a new register and load the value to it
+                                            reference = self.register_controller.new_temporal(args[i])
+                                        
+                                        # Load the value to the register
+                                        self.instruction_generator.load(Register(f"PARAM::{symbol.parameters[i].id}", None, None), reference.id)
+                                        self.register_controller.free_register(reference)   # Free the register
+
+                                    else:
+                                        # If the argument is not a variable, load the value to a register
+                                        self.instruction_generator.load(Register(f"PARAM::{symbol.parameters[i].id}", None, None), args[i].value)
+
+                                # Generate the jump call to the function
+                                self.instruction_generator.jump_link(f"{symbol.id.lower()}")
+
+                                return symbol.return_type
+                
+                return call_type
+            
+            # Check if the call is a class instance attribute
+            elif ctx.getChild(1).getText() == ".":
+                # Get the attribute identifier
+                attribute = ctx.IDENTIFIER(0).getText()
+                # Check if the call is inside a class definition
+                if self.in_class_assignment:
+                    # Search for the attribute in the class symbol table
+                    symbol = self.current_class.search_attribute(f"SELF::{attribute}")
+                    return symbol
+                
+                # Check if the call is a class method and outside a class definition
+                elif ctx.getChild(3):
+                    # Get the method identifier
+                    method_id = ctx.IDENTIFIER(0).getText()
+                    self.log(f"INFO -> Call for class method {method_id}")
+
+                    # Search if the method is part of the instance
+                    if ctx.primary().IDENTIFIER():
+                        # Get the instance identifier
+                        class_id = ctx.primary().IDENTIFIER().getText()
+                        class_instance = self.search_symbol(class_id, Variable)
+                        # Search for the class in the symbol table
+                        class_symbol = self.search_symbol(class_instance.data_type.class_ref.id, Class)
+
+                        # If found, search for the method in the class symbol table
+                        if class_symbol is not None:
+                            method = class_symbol.search_method(method_id)
+
+                            # Check if the method is found
+                            if method is not None:
+                                # Initialize args
+                                args = None
+                                # If the method has arguments, visit them
+                                if ctx.arguments():
+                                    # Get the arguments
+                                    args = self.visitArguments(ctx.arguments())
+
+                                # Generate the load of the instance to a register
+                                self.instruction_generator.load(Register("SELF", None, None), class_id)
+
+                                # Iterate over the arguments and save the values to the registers
+                                for i in range(0, len(method.parameters)):
+                                    # Check if its a variable
+                                    if isinstance(args[i], Variable):
+                                        reference = self.register_controller.get_register_with_symbol(args[i])
+                                        # Check if the register is found
+                                        if reference is None:
+                                            # If the register is not found, create a new register and load the value to it
+                                            reference = self.register_controller.new_temporal(args[i])
+                                        
+                                        # Load the value to the register
+                                        self.instruction_generator.load(Register(f"PARAM::{method.parameters[i].id}", None, None), reference.id)
+                                        self.register_controller.free_register(reference)   # Free the register 
+
+                                    else:
+                                        # If the argument is not a variable, load the value to a register
+                                        self.instruction_generator.load(Register(f"PARAM::{method.parameters[i].id}", None, None), args[i].value)
+
+                                # Generate the jump call to the method
+                                self.instruction_generator.jump_link(f"{method.id.lower()}_{class_symbol.id.lower()}")
+
+                                return method.return_type
+                            
+                    # Search for the metho in the symbol table
+                    for symbol in self.symbol_table:
+                        # Check if the symbol exists in the symbol table
+                        if symbol.id == method and isinstance(symbol, Function):
+                            return symbol.return_type
+                        
+                    # At this point the method is not found in the symbol table
+                    raise Exception(f"Method {method} not found in symbol table")
+                
+                else:
+                    # We are outside a class definition, search for the attribute in the symbol table
+                    for symbol in self.symbol_table:
+                        # Check if the symbol exists in the symbol table
+                        if symbol.id == attribute and isinstance(symbol, Variable):
+                            return symbol
+                        
+        else:
+            # If the call is a wrapper node, visit the children
+            self.log("INFO -> Wrapper node, skipping...")
+            return self.visitPrimary(ctx.primary())
 
 
     def visitPrimary(self, ctx:compiscriptParser.PrimaryContext):
@@ -976,7 +1236,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Check if the primary is a boolean
             elif primary_str in ["true", "false"]:
                 # Get the boolean
-                boolean = primary_str
+                boolean = ctx.getText()
                 self.log(f"INFO -> Boolean: {boolean}")
                 # Return the boolean type with the value
                 return BooleanType(value=boolean)
@@ -984,7 +1244,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Check if the primary is a nil
             elif primary_str == "nil":
                 # Get the nil
-                nil = primary_str
+                nil = ctx.getText()
                 self.log(f"INFO -> Nil: {nil}")
                 # Return the nil type with the value
                 return NilType(value=nil)
@@ -992,7 +1252,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # Check if the primary is an identifier
             elif ctx.IDENTIFIER():
                 # Get the identifier
-                identifier = primary_str
+                identifier = ctx.IDENTIFIER().getText()
                 self.log(f"INFO -> Identifier: {identifier}")
                 # Search for the identifier in the symbol table
                 symbol = self.search_symbol(identifier, Variable)
@@ -1025,5 +1285,31 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 self.visitInstantiation(ctx.instantiation())
 
         else:
-            #TODO: this is an expression
-            pass
+            # The primary node has children, this means it is an expression
+            # or a super call
+
+            # Check if the primary is a expression
+            if ctx.expression():
+                return self.visit(ctx.expression())
+            
+            # Check if the primari is a super call
+            if ctx.getChild(0).getText() == "super":
+                # Get the identifier
+                identifier = ctx.IDENTIFIER().getText()
+                self.log(f"INFO -> Super call for method {identifier}")
+                self.super_call = True  # Set the super call flag
+
+                # Search for the function in the parent class
+                if self.current_class is not None:
+                    if self.current_class.parent is not None:
+                        symbol = self.current_class.parent.search_method(identifier)
+                        if symbol is None:
+                            raise Exception(f"Method {identifier} not found in parent class {self.current_class.parent.id}")
+                        
+                        return symbol.return_type
+                    
+                    else:
+                        raise Exception(f"Parent class not found for class {self.current_class.id}")
+                
+                else:
+                    raise Exception(f"Super call outside of class")

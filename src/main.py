@@ -48,9 +48,9 @@ def main():
     ci_generator.generate_intermediate_code()
 
 if __name__ == '__main__':
-    # try:
+    try:
         main()
-    # except ParseCancellationException as e:
-    #     print(e)
-    # except Exception as e:
-    #     print(f"ERROR -> {e}")
+    except ParseCancellationException as e:
+        print(e)
+    except Exception as e:
+        print(f"ERROR -> {e}")
