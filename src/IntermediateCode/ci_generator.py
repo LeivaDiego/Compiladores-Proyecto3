@@ -371,7 +371,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 # Search for it and use the offset of the class attribute to access it
                 type = self.visitAssignment(ctx.assignment())   # Get the value of the assignment
                 var:Variable = self.current_class.search_attribute(var_id)   # Search for the attribute
-                var.id = f"SELF::{var.id}" # Add the SELF prefix to the id
+                new_id = f"SELF::{var.id}" # Add the SELF prefix to the id
 
                 # Check if is and isntantiation object
                 # We handle the instantiation in the instantiation node
@@ -384,7 +384,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 if var_register is None:
                     # If a register is not found, load the value to a register
                     var_register = self.register_controller.new_save(var.data_type, var)    # Create a new register
-                    self.instruction_generator.load(var_register, var.id)   # Load the value to the register
+                    self.instruction_generator.load(var_register, new_id)   # Load the value to the register
                 
                 # If the value is a register, save it directly, 
                 # otherwise load it to a register and free up the register that was holding the value
@@ -438,7 +438,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 # Search for the attribute in the class and use the offset to access it
                 type = self.visitAssignment(ctx.assignment())
                 var:Variable = self.current_class.search_attribute(var_id)
-                var.id = f"SELF::{var.id}" # Add the SELF prefix to the id
+                new_id = f"SELF::{var.id}" # Add the SELF prefix to the id
 
                 # Again, we handle the instantiation in the instantiation node
                 if isinstance(var.data_type, InstanceType):
@@ -450,7 +450,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 if var_register is None:
                     # If the register is not found, load the value to a register
                     var_register = self.register_controller.new_save(var.data_type, var)    # Create a new register
-                    self.instruction_generator.load(var_register, var.id)   # Load the value to the register
+                    self.instruction_generator.load(var_register, new_id)   # Load the value to the register
 
                 # If the value is a register, save it directly,
                 # otherwise load it to a register and free up the register that was holding the value
@@ -1147,8 +1147,17 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 # Check if the call is inside a class definition
                 if self.in_class_assignment:
                     # Search for the attribute in the class symbol table
-                    symbol = self.current_class.search_attribute(f"SELF::{attribute}")
-                    return symbol
+                    symbol = self.current_class.search_attribute(attribute)
+                    # Create a copy of the symbol
+                    # If we dont copy the symbol, we will be modifying the original symbol
+                    # and thus altering the attribute id, making it impossible to search for it
+                    copy = Variable(f"SELF::{symbol.id}", symbol.type)
+                    # Set the attributes of the copy
+                    copy.scope = symbol.scope
+                    copy.offset = symbol.offset
+                    copy.data_type = symbol.data_type
+
+                    return copy
                 
                 # Check if the call is a class method and outside a class definition
                 elif ctx.getChild(3):
