@@ -30,9 +30,10 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         self.current_variable: Variable = None  # Reference to the current variable
         self.current_function: Function = None  # Reference to the current function
         self.current_class: Class = None        # Reference to the current class
+
+        # Jump Helpers
         self.current_jump_call = ""             # Reference to the current jump call
         self.current_inverse_call = ""          # Reference to the current inverse call
-        
         
         # Helper flags
         self.in_init = False                    # Flag to indicate if we are in the init function
@@ -71,7 +72,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 if isinstance(symbol.data_type, InstanceType):
                     # This means we need to add its attributes, so search for them
                     # in the class reference
-                    for attribute in self.search_symbol(symbol.data_type.class_ref, Class):
+                    for attribute in self.search_symbol(symbol.data_type.class_ref.id, Class).attributes:
                         # Add the attribute to the data section as an attribute of the class
                         # otherwize, it will be added as a variable (Pass True to is_attr)
                         self.instruction_generator.add_to_data(attribute.data_type, attribute.id, True)
@@ -154,7 +155,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         # Get the variable id
         var_id = ctx.IDENTIFIER().getText()
         # Search for the variable in the symbol table
-        var = self.search_symbol(var_id, Variable)
+        var:Variable = self.search_symbol(var_id, Variable)
         # Set current variable
         self.current_variable = var
         # Get the type of the variable
@@ -196,6 +197,11 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             else:
                 temp = self.instruction_generator.load(temp, var_type.value)
 
+            # Save the value to the register
+            self.instruction_generator.save(var_register, temp)
+            # Free the register
+            self.register_controller.free_register(temp)
+
         # Reset the current variable
         self.current_variable = None
         # Free the register
@@ -215,7 +221,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 # This means we are initializing a class attribute
                 # Search for it and use the offset of the class attribute to access it
                 var_type = self.visitAssignment(ctx.assignment())   # Get the value of the assignment
-                var = self.current_class.search_attribute(var_id)   # Search for the attribute
+                var:Variable = self.current_class.search_attribute(var_id)   # Search for the attribute
                 var.id = f"SELF::{var.id}" # Add the SELF prefix to the id
 
                 # Check if is and isntantiation object
@@ -282,7 +288,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 # This means we are assigning a value to a class attribute
                 # Search for the attribute in the class and use the offset to access it
                 var_type = self.visitAssignment(ctx.assignment())
-                var = self.current_class.search_attribute(var_id)
+                var:Variable = self.current_class.search_attribute(var_id)
                 var.id = f"SELF::{var.id}" # Add the SELF prefix to the id
 
                 # Again, we handle the instantiation in the instantiation node
@@ -338,7 +344,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # We are assigning a value to a variable
             else:
                 var_type = self.visitAssignment(ctx.assignment())
-                var = self.search_symbol(var_id, Variable)
+                var:Variable = self.search_symbol(var_id, Variable)
 
                 # If its a class instance, we handle the instantiation in the instantiation node
                 if isinstance(var.data_type, InstanceType):
@@ -391,7 +397,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # At first ignore the inverse tag for the first child and apply it to the last
             inverse_label = self.current_inverse_call
             # Iterate over the children
-            for i in range(len(ctx.logic_and)-1):
+            for i in range(0, len(ctx.logic_and())-1):
                 # Visit the logic_and node for the current child
                 expression = self.visitLogic_and(ctx.logic_and(i))
                 # Free the registers of the comparison
@@ -420,7 +426,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             # we jump to the next comparison
             original_jump = self.current_jump_call
             # Iterate over the children
-            for i in range(len(ctx.equality)-1):
+            for i in range(0, len(ctx.equality())-1):
                 # Create a label for the comparison
                 next_label = self.create_label()
                 self.current_jump_call = next_label
@@ -713,6 +719,230 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             self.log("INFO -> Wrapper node, skipping...")
             return self.visitTerm(ctx.term(0))
         
+
+    def visitTerm(self, ctx:compiscriptParser.TermContext):
+        self.log("VISIT -> Term node")
+        # Check if the term is a wrapper node
+        if ctx.getChildCount() > 1:
+            # Get the left expression
+            left = self.visitFactor(ctx.factor(0))
+            # Iterate over the rest of the children
+            for i in range(1, len(ctx.factor())):
+                # Get the right expression
+                right = self.visitFactor(ctx.factor(i))
+                # Get the operator (every second child)
+                operator = ctx.getChild(2 * i - 1).getText() #-> "+" | "-"
+
+                # Check if the left expression is a register
+                if isinstance(left, Register):
+                    # Check the type of register and get the value
+                    if left.type == "return":
+                        # A return register ($v0, $v1) value must 
+                        # be moved to a temporal register in order to compare
+                        # it with the right expression (and not lose the return value)
+                        temp = self.register_controller.new_temporal(left.value, left.symbol)
+                        self.register_controller.move(temp, left)  # Move the value to the temporal register
+                        self.instruction_generator.move(temp, left)  # Move the value to the temporal register
+                        self.register_controller.free_register(left)  # Free the return register
+                        left = temp   # Set the left expression to the temporal register
+
+                # Check if the left expression is a variable
+                elif isinstance(left, Variable):
+                    # If the left expression is a variable, we need to load the value to a register
+                    tmp = self.register_controller.get_register_with_symbol(left)
+                    if tmp is None:
+                        # If the register is not found, create a new register and load the value to it
+                        tmp = self.register_controller.new_temporal(left.data_type, left)
+                        self.instruction_generator.load(tmp, left.id)
+                    left = tmp
+
+                else:
+                    # If the left expression is an immediate value, we need to load it to a register
+                    temp = self.register_controller.new_temporal(left)
+                    # check if the left expression is a string
+                    if isinstance(left, StringType):
+                        # If it is, load the value from the string constants buffer
+                        self.instruction_generator.load(temp, self.string_constants.get(left.value, "BUFFER"))
+                    else:
+                        # Otherwise, load the value to the register
+                        self.instruction_generator.load(temp, left.value)
+                    left = temp
+
+                
+                # Now we need to do the same for the right expression
+                # Check if the right expression is a register
+                if isinstance(right, Register):
+                    if right.type == "return":
+                        # A return register ($v0, $v1) value must
+                        # be moved to a temporal register in order to compare
+                        # it with the left expression (and not lose the return value)
+                        temp = self.register_controller.new_temporal(right.value, right.symbol)
+                        self.register_controller.move(temp, right) # Move the value to the temporal register
+                        self.instruction_generator.move(temp, right) # Move the value to the temporal register
+                        self.register_controller.free_register(right) # Free the return register
+                        right = temp   # Set the right expression to the temporal register
+
+                elif isinstance(right, Variable):
+                    # If the right expression is a variable, we need to load the value to a register
+                    tmp = self.register_controller.get_register_with_symbol(right)
+                    if tmp is None:
+                        # If the register is not found, create a new register and load the value to it
+                        tmp = self.register_controller.new_temporal(right.data_type, right)
+                        self.instruction_generator.load(tmp, right.id)
+                    right = tmp
+
+                else:
+                    # If the right expression is an immediate value, we need to load it to a register
+                    temp = self.register_controller.new_temporal(right)
+                    # check if the right expression is a string
+                    if isinstance(right, StringType):
+                        # If it is, load the value from the string constants buffer
+                        self.instruction_generator.load(temp, self.string_constants.get(right.value, "BUFFER"))
+                    else:
+                        # Otherwise, load the value to the register
+                        self.instruction_generator.load(temp, right.value)
+                    right = temp
+
+
+                # Now get the operators and compare the values
+                if operator == "+":
+                    # Concatenate or add operator
+                    # Check if the expressions are strings, this means we need to concatenate them
+                    if isinstance(left, StringType) and isinstance(right, StringType):
+                        temp = self.register_controller.new_temporal(StringType(value=f"{left.value}{right.value}"))
+                        self.instruction_generator.load(temp, self.string_constants.get(left.value, "BUFFER"))
+
+                    else:
+                        temp = self.register_controller.new_temporal(left.value)
+                        self.instruction_generator.add(temp, left, right)
+
+                else:
+                    # Subtract operator
+                    temp = self.register_controller.new_temporal(left.value)
+                    self.instruction_generator.sub(temp, left, right)
+
+                # Free the registers
+                self.register_controller.free_register(left)
+                self.register_controller.free_register(right)
+                left = temp # Set the left expression to the temporal register
+            return left
+        
+        else:
+            # If the term is a wrapper node, visit the children
+            self.log("INFO -> Wrapper node, skipping...")
+            return self.visitFactor(ctx.factor(0))
+        
+
+    def visitFactor(self, ctx:compiscriptParser.FactorContext):
+        self.log("VISIT -> Factor node")
+        # Check if the factor is a wrapper node
+        if ctx.getChildCount() > 1:
+            # Get the left expression
+            left = self.visitUnary(ctx.unary(0))
+            # Iterate over the rest of the children
+            for i in range(1, len(ctx.unary())):
+                # Get the right expression
+                right = self.visitUnary(ctx.unary(i))
+                # Get the operator (every second child)
+                operator = ctx.getChild(2 * i - 1).getText() #-> "*" | "/" | "%"
+
+                # Check if the left expression is a register
+                if isinstance(left, Register):
+                    # Check the type of register and get the value
+                    if left.type == "return":
+                        # A return register ($v0, $v1) value must 
+                        # be moved to a temporal register in order to compare
+                        # it with the right expression (and not lose the return value)
+                        temp = self.register_controller.new_temporal(left.value, left.symbol)
+                        self.register_controller.move(temp, left)  # Move the value to the temporal register
+                        self.instruction_generator.move(temp, left)  # Move the value to the temporal register
+                        self.register_controller.free_register(left)  # Free the return register
+                        left = temp   # Set the left expression to the temporal register
+
+                # Check if the left expression is a variable
+                elif isinstance(left, Variable):
+                    # If the left expression is a variable, we need to load the value to a register
+                    tmp = self.register_controller.get_register_with_symbol(left)
+                    if tmp is None:
+                        # If the register is not found, create a new register and load the value to it
+                        tmp = self.register_controller.new_temporal(left.data_type, left)
+                        self.instruction_generator.load(tmp, left.id)
+                    left = tmp
+
+                else:
+                    # If the left expression is an immediate value, we need to load it to a register
+                    temp = self.register_controller.new_temporal(left)
+                    # check if the left expression is a string
+                    if isinstance(left, StringType):
+                        # If it is, load the value from the string constants buffer
+                        self.instruction_generator.load(temp, self.string_constants.get(left.value, "BUFFER"))
+                    else:
+                        # Otherwise, load the value to the register
+                        self.instruction_generator.load(temp, left.value)
+                    left = temp
+
+                
+                # Now we need to do the same for the right expression
+                # Check if the right expression is a register
+                if isinstance(right, Register):
+                    if right.type == "return":
+                        # A return register ($v0, $v1) value must
+                        # be moved to a temporal register in order to compare
+                        # it with the left expression (and not lose the return value)
+                        temp = self.register_controller.new_temporal(right.value, right.symbol)
+                        self.register_controller.move(temp, right) # Move the value to the temporal register
+                        self.instruction_generator.move(temp, right) # Move the value to the temporal register
+                        self.register_controller.free_register(right) # Free the return register
+                        right = temp   # Set the right expression to the temporal register
+
+                elif isinstance(right, Variable):
+                    # If the right expression is a variable, we need to load the value to a register
+                    tmp = self.register_controller.get_register_with_symbol(right)
+                    if tmp is None:
+                        # If the register is not found, create a new register and load the value to it
+                        tmp = self.register_controller.new_temporal(right.data_type, right)
+                        self.instruction_generator.load(tmp, right.id)
+                    right = tmp
+
+                else:
+                    # If the right expression is an immediate value, we need to load it to a register
+                    temp = self.register_controller.new_temporal(right)
+                    # check if the right expression is a string
+                    if isinstance(right, StringType):
+                        # If it is, load the value from the string constants buffer
+                        self.instruction_generator.load(temp, self.string_constants.get(right.value, "BUFFER"))
+                    else:
+                        # Otherwise, load the value to the register
+                        self.instruction_generator.load(temp, right.value)
+                    right = temp
+
+                # Now get the operators and compare the values
+                temp = self.register_controller.new_temporal(right.value)
+
+                if operator == "*":
+                    # Multiply operator
+                    self.instruction_generator.mult(temp, left, right)
+                
+                elif operator == "/":
+                    # Divide operator
+                    self.instruction_generator.div(temp, left, right)
+
+                elif operator == "%":
+                    # Modulus operator
+                    self.instruction_generator.mod(temp, left, right)
+
+                # Free the registers
+                self.register_controller.free_register(left)
+                self.register_controller.free_register(right)
+                left = temp # Set the left expression to the temporal register
+
+            return left
+        
+        else:
+            # If the factor is a wrapper node, visit the children
+            self.log("INFO -> Wrapper node, skipping...")
+            return self.visitUnary(ctx.unary(0))
+
 
     def visitPrimary(self, ctx:compiscriptParser.PrimaryContext):
         self.log("VISIT -> Primary node")
