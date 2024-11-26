@@ -160,6 +160,27 @@ class IntermediateCodeGenerator(compiscriptVisitor):
             self.visitStatement(ctx.statement())
 
 
+    def visitClassDecl(self, ctx:compiscriptParser.ClassDeclContext):
+        self.log("VISIT -> ClassDecl node")
+        # Get the class id
+        class_id = ctx.IDENTIFIER(0).getText()
+        # Set the current class
+        self.current_class = self.search_symbol(class_id, Class)
+        # Turn on the class assignment flag
+        self.in_class_assignment = True
+
+        # Iterate over the class functions
+        for function in ctx.function():
+            # Visit the function
+            self.visitFunction(function)
+
+        # Turn off the class assignment flag
+        self.in_class_assignment = False
+        # Reset the current class
+        self.current_class = None
+
+        return
+
     def visitFunction(self, ctx:compiscriptParser.FunctionContext):
         self.log("VISIT -> Function node")
         # Get the function id
@@ -938,7 +959,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                     # Check if the expressions are strings, this means we need to concatenate them
                     if isinstance(left.value, StringType) or isinstance(right.value, StringType):
                         temp = self.register_controller.new_temporal(StringType(value=str(left)+str(right)))
-                        self.instruction_generator.concat(temp, left, right)
+                        self.instruction_generator.concatenate(temp, left, right)
 
                     else:
                         temp = self.register_controller.new_temporal(right.value)
@@ -1313,3 +1334,49 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 
                 else:
                     raise Exception(f"Super call outside of class")
+
+
+
+    def visitInstantiation(self, ctx: compiscriptParser.InstantiationContext):
+        self.log("VISIT -> Instantiation node")
+        # Get the class identifier
+        class_id = ctx.IDENTIFIER().getText()
+        self.log(f"INFO -> Instantiation of class {class_id}")
+        # Search for the class in the symbol table
+        class_symbol = self.search_symbol(class_id, Class)  # We assume the class exists (semantic should have checked this)
+        
+        # Initialize instance arguments
+        args = None
+        
+        # Check if the instantiation has arguments
+        if ctx.arguments():
+            # Get the arguments
+            args = self.visitArguments(ctx.arguments())
+
+        # Search for the initialization method in the class symbol table
+        initializer = class_symbol.search_method("init")
+        
+        # Load the class instance to a register
+        # We use the SELF keyword to identify the instance
+        self.instruction_generator.load(Register("SELF", None, None), class_id)
+        # Check if the instantiation has arguments
+        for i in range(0, len(initializer.parameters)):
+            # Check if its a variable
+            if isinstance(args[i], Variable):
+                # Get the reference
+                reference = self.register_controller.get_register_with_symbol(args[i])
+                # Check if the register is found
+                if reference is None:
+                    # If the register is not found, create a new register and load the value to it
+                    reference = self.register_controller.new_temporal(args[i])
+
+                # Load the value to the register (as param)
+                self.instruction_generator.load(Register(f"PARAM::{initializer.parameters[i].id}", None, None), reference.id)
+                self.register_controller.free_register(reference)   # Free the register
+
+            else:
+                # If the argument is not a variable, load the value to a register
+                self.instruction_generator.load(Register(f"PARAM::{initializer.parameters[i].id}", None, None), args[i].value)
+
+        # Generate the jump call to the initialization method
+        self.instruction_generator.jump_link(f"{initializer.id.lower()}_{class_symbol.id.lower()}")

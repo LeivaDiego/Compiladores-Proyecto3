@@ -298,7 +298,7 @@ class InstructionGenerator():
         self.data_section.append("# End of program")
         self.data_section.append("li $v0, 10     # Set mode to exit")
         self.data_section.append("syscall       # Exit the program")
-        self.data_section.append("\n\n")
+        self.data_section.append("\n")
 
         # Add the local context to the data section
         self.data_section.extend(self.local_context)

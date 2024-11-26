@@ -1,1 +1,14 @@
-var numero = 5;
+class Persona {
+  init(nombre, edad) {
+    this.nombre = nombre;
+    this.edad = edad;
+    this.color = "rojo";
+  }
+
+  saludar() {
+    print "Hola, mi nombre es " + this.nombre;
+  }
+}
+
+var nombre = "Erick";
+var personita = new Persona(nombre, 20);

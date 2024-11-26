@@ -1,15 +1,43 @@
 .data
-numero: .word 5
+nombre: .asciiz "Erick"
+personita:     # Class Instance personita
+    .asciiz "Erick"
+    .word 20
+    .asciiz "rojo"
+STR_0: .asciiz "rojo"
+STR_1: .asciiz "Hola, mi nombre es "
+BUFFER: .space 200
+STR_2: .asciiz "Erick"
 
 
 .text
 .globl main     # Entry point of the program
 main:
-load $s0, numero    # Load data into register $s0
-load $t0, 5    # Load data into register $t0
-save $s0, $t0    # save data into register
+load $t0, nombre    # Load data into register $t0
+load $t0, STR_2    # Load data into register $t0
+save $t0, $t0    # save data into register
+load SELF, Persona    # Load data into register SELF
+load PARAM::nombre, $t0    # Load data into register PARAM::nombre
+load PARAM::edad, 20    # Load data into register PARAM::edad
+jal init_persona    # Jump and link to init_persona
 # End of program
 li $v0, 10     # Set mode to exit
 syscall       # Exit the program
 
 
+init_persona:
+load $s0, SELF::nombre    # Load data into register $s0
+save $s0, $t0    # save data into register
+save $s0, $t0    # save data into register
+load $t0, SELF::edad    # Load data into register $t0
+save $t0, $t0    # save data into register
+save $t0, $t0    # save data into register
+load $t0, SELF::color    # Load data into register $t0
+load $t0, STR_0    # Load data into register $t0
+save $t0, $t0    # save data into register
+jr $ra    # Return to caller
+saludar_persona:
+load $t0, STR_1    # Load data into register $t0
+load $t0, SELF::nombre    # Load data into register $t0
+concat $t0, $t0, $t0    # Concatenation operation
+jr $ra    # Return to caller
