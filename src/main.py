@@ -10,7 +10,7 @@ from IntermediateCode.ci_generator import IntermediateCodeGenerator
 
 def main():
     # Get the input file and create a file stream
-    input_file = 'src/Input/Examples/Ejemplo5.cspt'
+    input_file = 'src/Input/test.cspt'
     input_stream = FileStream(input_file)
 
     # Create the lexer and use a custom error listener
@@ -43,14 +43,14 @@ def main():
     semantic_analyzer.display_table()
 
     # Create a CI Generator and visit the parse tree
-    ci_generator = IntermediateCodeGenerator(semantic_analyzer.symbol_table)
+    ci_generator = IntermediateCodeGenerator(semantic_analyzer.symbol_table, logging=True)
     ci_generator.visit(parse_tree)
     ci_generator.generate_intermediate_code()
 
 if __name__ == '__main__':
-    try:
+    # try:
         main()
-    except ParseCancellationException as e:
-        print(e)
-    except Exception as e:
-        print(f"ERROR -> {e}")
+    # except ParseCancellationException as e:
+    #     print(e)
+    # except Exception as e:
+    #     print(f"ERROR -> {e}")

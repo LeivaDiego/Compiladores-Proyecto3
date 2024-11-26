@@ -203,7 +203,7 @@ class RegisterController():
         return Register("$v0", "return", value)
     
 
-    def move_register(self, destination:Register, source:Register):
+    def move(self, destination:Register, source:Register):
         """
         Moves the value of the source register into the destination register
         and frees the source register

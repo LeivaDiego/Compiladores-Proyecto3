@@ -745,7 +745,7 @@ class SemanticAnalyzer(compiscriptVisitor):
             primary_str = ctx.getText()
 
             # Check if the primary is a value
-            if self.current_variable is not None and not self.ssion:
+            if self.current_variable is not None:
                 # We can assume the primary is the value of the variable
                 # Check if the primary is a number
                 if ctx.NUMBER():
