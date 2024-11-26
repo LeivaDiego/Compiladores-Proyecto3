@@ -1,68 +1,82 @@
 .data
-numero: .word 10
-STR_0: .asciiz "El termino "
-STR_1: .asciiz " de la serie de Fibonacci es: "
+totalConImpuesto: .word 0
+caja:     # Class Instance caja
+    .word 12
+    .word 0
+STR_0: .asciiz "Producto agregado con precio: "
 BUFFER: .space 200
+STR_1: .asciiz "El total con impuesto es: "
+STR_2: .asciiz "La caja registradora se ha reiniciado."
 
 
 .text
 .globl main     # Entry point of the program
 main:
-load $t5, numero    # Load data into register $t5
-load $t5, 10    # Load data into register $t5
-save $t5, $t5    # save data into register
-load PARAM::n, $t5    # Load data into register PARAM::n
-jal fibonacci    # Jump and link to fibonacci
-load $t5, resultado    # Load data into register $t5
-load $t5, None    # Load data into register $t5
-save $t5, $t5    # save data into register
-load $t5, STR_0    # Load data into register $t5
-load $t5, numero    # Load data into register $t5
-add $t0, $t5, $t5    # Addition operation
-load $t5, STR_1    # Load data into register $t5
-concat $t5, $t0, $t5    # Concatenation operation
-load $t0, resultado    # Load data into register $t0
-concat $t5, $t5, $t0    # Concatenation operation
-load $a0, BUFFER   # Load string buffer to print into $a0
-load $v0, 4     # Set mode to print 4
-syscall  # Print the value
+load SELF, CajaRegistradora    # Load data into register SELF
+load PARAM::impuesto, 12    # Load data into register PARAM::impuesto
+jal init_cajaregistradora    # Jump and link to init_cajaregistradora
+load SELF, caja    # Load data into register SELF
+load PARAM::precio, 100    # Load data into register PARAM::precio
+jal agregarproducto_cajaregistradora    # Jump and link to agregarproducto_cajaregistradora
+load SELF, caja    # Load data into register SELF
+load PARAM::precio, 50    # Load data into register PARAM::precio
+jal agregarproducto_cajaregistradora    # Jump and link to agregarproducto_cajaregistradora
+load SELF, caja    # Load data into register SELF
+load PARAM::precio, 25    # Load data into register PARAM::precio
+jal agregarproducto_cajaregistradora    # Jump and link to agregarproducto_cajaregistradora
+load SELF, caja    # Load data into register SELF
+jal calculartotalconimpuesto_cajaregistradora    # Jump and link to calculartotalconimpuesto_cajaregistradora
+load SELF, caja    # Load data into register SELF
+jal reiniciar_cajaregistradora    # Jump and link to reiniciar_cajaregistradora
 # End of program
 li $v0, 10     # Set mode to exit
 syscall       # Exit the program
 
 
-fibonacci:
-load $t0, n    # Load data into register $t0
-load $t1, 1    # Load data into register $t1
-beq $t0, $t1, L0    # Jump to L0 if equals
-slt $t2, $t0, $t1   # Save 1 if $t0 < $t1 else 0
-bne $t2, $zero, L0    # Jump to L0 if not equals
-beq $t2, $zero, L1    # Jump to L1 if equals
-L0:
-load $t0, n    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L2    # Jump to L2
-L1:
-load $t0, n    # Load data into register $t0
-load $t1, 1    # Load data into register $t1
-sub $t3, $t0, $t1    # Subtraction operation
-load PARAM::n, num    # Load data into register PARAM::n
-jal fibonacci    # Jump and link to fibonacci
-load $s0, a    # Load data into register $s0
-load $t0, None    # Load data into register $t0
+init_cajaregistradora:
+load $s0, SELF::impuesto    # Load data into register $s0
+save $s0, $s0    # save data into register
 save $s0, $t0    # save data into register
-load $t0, n    # Load data into register $t0
-load $t1, 2    # Load data into register $t1
-sub $t4, $t0, $t1    # Subtraction operation
-load PARAM::n, num    # Load data into register PARAM::n
-jal fibonacci    # Jump and link to fibonacci
-load $t0, b    # Load data into register $t0
-load $t1, None    # Load data into register $t1
+load $t0, SELF::total    # Load data into register $t0
+load $t1, 0    # Load data into register $t1
 save $t0, $t1    # save data into register
-load $t0, a    # Load data into register $t0
-load $t1, b    # Load data into register $t1
-add $t5, $t0, $t1    # Addition operation
-move $v0, $t5    # Move value from $t5 to $v0
 jr $ra    # Return to caller
-L2:
+agregarproducto_cajaregistradora:
+load $t0, SELF::total    # Load data into register $t0
+load $t1, precio    # Load data into register $t1
+add $t2, $t0, $t1    # Addition operation
+load $t0, SELF::total    # Load data into register $t0
+save $t0, $t2    # save data into register
+load $t0, STR_0    # Load data into register $t0
+load $t2, precio    # Load data into register $t2
+concat $t1, $t0, $t2    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
+jr $ra    # Return to caller
+calculartotalconimpuesto_cajaregistradora:
+load $t1, SELF::total    # Load data into register $t1
+load $t0, SELF::impuesto    # Load data into register $t0
+mult $t2, $t1, $t0    # Multiplication operation
+load $t1, 100    # Load data into register $t1
+div $t2, $t1
+mflo $t0    # Save the quotient (from LO register) into destination
+load $t2, SELF::total    # Load data into register $t2
+add $t1, $t2, $t0    # Addition operation
+load $t2, totalConImpuesto    # Load data into register $t2
+save $t2, $t1    # save data into register
+load $t2, STR_1    # Load data into register $t2
+load $t1, totalConImpuesto    # Load data into register $t1
+concat $t0, $t2, $t1    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
+jr $ra    # Return to caller
+reiniciar_cajaregistradora:
+load $t0, SELF::total    # Load data into register $t0
+load $t2, 0    # Load data into register $t2
+save $t0, $t2    # save data into register
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
+jr $ra    # Return to caller

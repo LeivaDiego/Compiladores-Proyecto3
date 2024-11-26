@@ -43,7 +43,7 @@ def main():
     semantic_analyzer.display_table()
 
     # Create a CI Generator and visit the parse tree
-    ci_generator = IntermediateCodeGenerator(semantic_analyzer.symbol_table)
+    ci_generator = IntermediateCodeGenerator(semantic_analyzer.symbol_table, logging=True)
     ci_generator.visit(parse_tree)
     ci_generator.generate_intermediate_code()
 

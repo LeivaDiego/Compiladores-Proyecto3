@@ -224,12 +224,22 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         self.log("VISIT -> Arguments node")
         # Initialize the arguments list
         arguments = []
-        for expression in ctx.expression():
-            # Iterate over the arguments and get their values
-            self.log(f"INFO -> Expression in arguments: {expression.getText()}")
-            arguments.append(self.visitExpression(expression))
+        
+        if isinstance(ctx, compiscriptParser.ExpressionContext):
+            # If the arguments are a single expression, visit the expression
+            self.log(f"INFO -> Single expression in arguments: {ctx.getText()}")
+            return self.visitExpression(ctx)
+        
+        else:
+            # Get the arguments expressions
+            expressions = ctx.expression()
 
-        return arguments
+            for expression in expressions:
+                # Iterate over the arguments and get their values
+                self.log(f"INFO -> Expression in arguments: {expression.getText()}")
+                arguments.append(self.visitExpression(expression))
+            
+            return arguments
     
 
     def visitParameters(self, ctx:compiscriptParser.ParametersContext):
@@ -1148,17 +1158,46 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 if self.in_class_assignment:
                     # Search for the attribute in the class symbol table
                     symbol = self.current_class.search_attribute(attribute)
-                    # Create a copy of the symbol
-                    # If we dont copy the symbol, we will be modifying the original symbol
-                    # and thus altering the attribute id, making it impossible to search for it
-                    copy = Variable(f"SELF::{symbol.id}", symbol.type)
-                    # Set the attributes of the copy
-                    copy.scope = symbol.scope
-                    copy.offset = symbol.offset
-                    copy.data_type = symbol.data_type
+                    if symbol:
+                        # Create a copy of the symbol
+                        # If we dont copy the symbol, we will be modifying the original symbol
+                        # and thus altering the attribute id, making it impossible to search for it
+                        copy = Variable(f"SELF::{symbol.id}", symbol.type)
+                        # Set the attributes of the copy
+                        copy.scope = symbol.scope
+                        copy.offset = symbol.offset
+                        copy.data_type = symbol.data_type
 
-                    return copy
+                        return copy
                 
+                    # At this point we are calling a method using this directive
+                    method = self.current_class.search_method(attribute)
+                    if method:
+                        # Check if it has arguments
+                        if ctx.arguments():
+                            arguments = ctx.arguments(0)
+                            for i in range(0, len(method.parameters)):
+                                arg = self.visitArguments(arguments.children[i])
+                                if isinstance(arg, Variable):
+                                    # Get the reference to the register
+                                    reference = self.register_controller.get_register_with_symbol(arg)
+                                    if reference is None:
+                                        # If the register is not found, create a new register and load the value to it
+                                        reference = self.register_controller.new_temporal(arg)
+                                    
+                                    # Load the value to the register
+                                    self.instruction_generator.load(Register(f"PARAM::{method.parameters[i].id}", None, None), reference.id)
+                                    # Free the register
+                                    self.register_controller.free_register(reference)
+                                # If the argument is not a variable, load the value to a register
+                                else:
+                                    self.instruction_generator.load(Register(f"PARAM::{method.parameters[i].id}", None, None), arg.value)
+
+                                # Generate the jump call to the method
+                                self.instruction_generator.jump_link(f"{method.id.lower()}_{self.current_class.id.lower()}")
+                                return method.return_type
+                
+
                 # Check if the call is a class method and outside a class definition
                 elif ctx.getChild(3):
                     # Get the method identifier
@@ -1184,7 +1223,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                                 # If the method has arguments, visit them
                                 if ctx.arguments():
                                     # Get the arguments
-                                    args = self.visitArguments(ctx.arguments())
+                                    args = self.visitArguments(ctx.arguments(0))
 
                                 # Generate the load of the instance to a register
                                 self.instruction_generator.load(Register("SELF", None, None), class_id)
@@ -1277,7 +1316,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 nil = ctx.getText()
                 self.log(f"INFO -> Nil: {nil}")
                 # Return the nil type with the value
-                return NilType(value=nil)
+                return NilType()
             
             # Check if the primary is an identifier
             elif ctx.IDENTIFIER():
