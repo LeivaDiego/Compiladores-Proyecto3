@@ -1,82 +1,135 @@
 .data
-totalConImpuesto: .word 0
-caja:     # Class Instance caja
-    .word 12
-    .word 0
-STR_0: .asciiz "Producto agregado con precio: "
+medio: .word 0
+valorMedio: .word 1
+buscador:     # Class Instance buscador
+objetivo: .word 7
+STR_0: .asciiz "El elemento "
+STR_1: .asciiz " esta en el indice: "
 BUFFER: .space 200
-STR_1: .asciiz "El total con impuesto es: "
-STR_2: .asciiz "La caja registradora se ha reiniciado."
 
 
 .text
 .globl main     # Entry point of the program
 main:
-load SELF, CajaRegistradora    # Load data into register SELF
-load PARAM::impuesto, 12    # Load data into register PARAM::impuesto
-jal init_cajaregistradora    # Jump and link to init_cajaregistradora
-load SELF, caja    # Load data into register SELF
-load PARAM::precio, 100    # Load data into register PARAM::precio
-jal agregarproducto_cajaregistradora    # Jump and link to agregarproducto_cajaregistradora
-load SELF, caja    # Load data into register SELF
-load PARAM::precio, 50    # Load data into register PARAM::precio
-jal agregarproducto_cajaregistradora    # Jump and link to agregarproducto_cajaregistradora
-load SELF, caja    # Load data into register SELF
-load PARAM::precio, 25    # Load data into register PARAM::precio
-jal agregarproducto_cajaregistradora    # Jump and link to agregarproducto_cajaregistradora
-load SELF, caja    # Load data into register SELF
-jal calculartotalconimpuesto_cajaregistradora    # Jump and link to calculartotalconimpuesto_cajaregistradora
-load SELF, caja    # Load data into register SELF
-jal reiniciar_cajaregistradora    # Jump and link to reiniciar_cajaregistradora
+load SELF, Busqueda    # Load data into register SELF
+jal init_busqueda    # Jump and link to init_busqueda
+load $t0, objetivo    # Load data into register $t0
+load $t0, 7    # Load data into register $t0
+save $t0, $t0    # save data into register
+load SELF, buscador    # Load data into register SELF
+load PARAM::izquierda, 0    # Load data into register PARAM::izquierda
+load PARAM::derecha, 6    # Load data into register PARAM::derecha
+load PARAM::objetivo, $t0    # Load data into register PARAM::objetivo
+jal busquedabinaria_busqueda    # Jump and link to busquedabinaria_busqueda
+load $t0, indice    # Load data into register $t0
+load $t0, None    # Load data into register $t0
+save $t0, $t0    # save data into register
+load $t0, STR_0    # Load data into register $t0
+load $t0, objetivo    # Load data into register $t0
+add $t0, $t0, $t0    # Addition operation
+load $t0, STR_1    # Load data into register $t0
+concat $t0, $t0, $t0    # Concatenation operation
+load $t0, indice    # Load data into register $t0
+add $t0, $t0, $t0    # Addition operation
+load $v0,      # Set mode to print 
+syscall  # Print the value
 # End of program
 li $v0, 10     # Set mode to exit
 syscall       # Exit the program
 
 
-init_cajaregistradora:
-load $s0, SELF::impuesto    # Load data into register $s0
-save $s0, $s0    # save data into register
-save $s0, $t0    # save data into register
-load $t0, SELF::total    # Load data into register $t0
-load $t1, 0    # Load data into register $t1
-save $t0, $t1    # save data into register
+init_busqueda:
 jr $ra    # Return to caller
-agregarproducto_cajaregistradora:
-load $t0, SELF::total    # Load data into register $t0
-load $t1, precio    # Load data into register $t1
-add $t2, $t0, $t1    # Addition operation
-load $t0, SELF::total    # Load data into register $t0
-save $t0, $t2    # save data into register
-load $t0, STR_0    # Load data into register $t0
-load $t2, precio    # Load data into register $t2
-concat $t1, $t0, $t2    # Concatenation operation
-load $a0, BUFFER   # Load string buffer to print into $a0
-load $v0, 4     # Set mode to print 4
-syscall  # Print the value
+obtenervalorenindice_busqueda:
+L0:
+load $t0, 1    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
 jr $ra    # Return to caller
-calculartotalconimpuesto_cajaregistradora:
-load $t1, SELF::total    # Load data into register $t1
-load $t0, SELF::impuesto    # Load data into register $t0
-mult $t2, $t1, $t0    # Multiplication operation
-load $t1, 100    # Load data into register $t1
-div $t2, $t1
+j L1    # Jump to L1
+L1:
+L2:
+load $t0, 3    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+j L3    # Jump to L3
+L3:
+L4:
+load $t0, 5    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+j L5    # Jump to L5
+L5:
+L6:
+load $t0, 7    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+j L7    # Jump to L7
+L7:
+L8:
+load $t0, 9    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+j L9    # Jump to L9
+L9:
+L10:
+load $t0, 11    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+j L11    # Jump to L11
+L11:
+L12:
+load $t0, 13    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+j L13    # Jump to L13
+L13:
+load $t0, 1    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+busquedabinaria_busqueda:
+load $t0, derecha    # Load data into register $t0
+load $t0, izquierda    # Load data into register $t0
+beq $t0, $t0, L14    # Jump to L14 if equals
+slt $t0, $t0, $t0   # Save 1 if $t0 < $t0 else 0
+bne $t0, $zero, L14    # Jump to L14 if not equals
+beq $t0, $zero, L15    # Jump to L15 if equals
+L14:
+load $t0, izquierda    # Load data into register $t0
+load $t0, derecha    # Load data into register $t0
+add $t0, $t0, $t0    # Addition operation
+load $t0, 2    # Load data into register $t0
+div $t0, $t0
 mflo $t0    # Save the quotient (from LO register) into destination
-load $t2, SELF::total    # Load data into register $t2
-add $t1, $t2, $t0    # Addition operation
-load $t2, totalConImpuesto    # Load data into register $t2
-save $t2, $t1    # save data into register
-load $t2, STR_1    # Load data into register $t2
-load $t1, totalConImpuesto    # Load data into register $t1
-concat $t0, $t2, $t1    # Concatenation operation
-load $a0, BUFFER   # Load string buffer to print into $a0
-load $v0, 4     # Set mode to print 4
-syscall  # Print the value
+load $s0, medio    # Load data into register $s0
+save $s0, $t0    # save data into register
+load PARAM::indice, $t0    # Load data into register PARAM::indice
+jal obtenervalorenindice_busqueda    # Jump and link to obtenervalorenindice_busqueda
+load $t0, valorMedio    # Load data into register $t0
+load $t0, 1    # Load data into register $t0
+save $t0, $t0    # save data into register
+load $t0, valorMedio    # Load data into register $t0
+load $t0, objetivo    # Load data into register $t0
+slt $t0, $t0, $t0   # Save 1 if $t0 < $t0 else 0
+bne $t0, $zero, L16    # Jump to L16 if not equals
+beq $t0, $zero, L17    # Jump to L17 if equals
+L16:
+load PARAM::izquierda, $t0    # Load data into register PARAM::izquierda
+jal busquedabinaria_busqueda    # Jump and link to busquedabinaria_busqueda
+load $t0, None    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
 jr $ra    # Return to caller
-reiniciar_cajaregistradora:
-load $t0, SELF::total    # Load data into register $t0
-load $t2, 0    # Load data into register $t2
-save $t0, $t2    # save data into register
-load $a0, BUFFER   # Load string buffer to print into $a0
-load $v0, 4     # Set mode to print 4
-syscall  # Print the value
+j L17    # Jump to L17
+L17:
+load $t0, medio    # Load data into register $t0
+load $t0, 1    # Load data into register $t0
+add $t0, $t0, $t0    # Addition operation
+load PARAM::izquierda, num    # Load data into register PARAM::izquierda
+jal busquedabinaria_busqueda    # Jump and link to busquedabinaria_busqueda
+load $t0, None    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
+jr $ra    # Return to caller
+j L15    # Jump to L15
+L15:
+load $t0, 1    # Load data into register $t0
+move $v0, $t0    # Move value from $t0 to $v0
 jr $ra    # Return to caller

@@ -420,10 +420,10 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                             tmp = self.register_controller.new_temporal(type)
                             self.instruction_generator.load(tmp, type.id)
 
-                        # Save the value to the register
-                        self.instruction_generator.save(var_register, tmp)
-                        # Free the register
-                        self.register_controller.free_register(tmp)
+                        # # Save the value to the register
+                        # self.instruction_generator.save(var_register, tmp)
+                        # # Free the register
+                        # self.register_controller.free_register(tmp)
                         
                     # If its a string and not in the string constants, 
                     # its in the buffer, so we need to load it to a register
