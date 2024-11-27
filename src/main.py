@@ -1,16 +1,15 @@
 from CompiScript.compiscriptLexer import compiscriptLexer
 from CompiScript.compiscriptParser import compiscriptParser
 from antlr4 import FileStream, CommonTokenStream
-from ParseTree.parse_tree import TreeVisualizer
-from antlr4.error.ErrorStrategy import DefaultErrorStrategy, ParseCancellationException
+from antlr4.error.ErrorStrategy import DefaultErrorStrategy
 from Utils.custom_exception import ThrowingErrorListener
 from SemanticAnalyzer.semantic_analyzer import SemanticAnalyzer
-from IntermediateCode.ci_generator import CIGenerator
+from IntermediateCode.ci_generator import IntermediateCodeGenerator
 
 
 def main():
     # Get the input file and create a file stream
-    input_file = 'src/Input/Examples/Ejemplo5.cspt'
+    input_file = 'src/Input/Examples/Ejemplo4.cspt'
     input_stream = FileStream(input_file)
 
     # Create the lexer and use a custom error listener
@@ -29,28 +28,21 @@ def main():
 
     # Start parsing from the program rule
     parse_tree = parser.program()
-
-    # Create a TreeVisualizer object and visit the parse tree
-    # tree_visualizer = TreeVisualizer(input_file)
-    # tree_visualizer.visit(parse_tree)
-    # tree_visualizer.render(output_file=tree_visualizer.name, 
-    #                        format='png',
-    #                        output_dir='src/ParseTree/Output')
     
     # Create a semantic analyzer and visit the parse tree
-    semantic_analyzer = SemanticAnalyzer(logging=True)
+    semantic_analyzer = SemanticAnalyzer()
     semantic_analyzer.visit(parse_tree)
     semantic_analyzer.display_table()
 
     # Create a CI Generator and visit the parse tree
-    ci_generator = CIGenerator(semantic_analyzer.symbol_table, logging=True)
+    ci_generator = IntermediateCodeGenerator(semantic_analyzer.symbol_table)
     ci_generator.visit(parse_tree)
-    # TODO: Implement the CI Generator to generate the intermediate code
+    ci_generator.generate_intermediate_code()
 
 if __name__ == '__main__':
-    try:
+    # try:
         main()
-    except ParseCancellationException as e:
-        print(e)
-    except Exception as e:
-        print(f"ERROR -> {e}")
+    # except ParseCancellationException as e:
+    #     print(e)
+    # except Exception as e:
+    #     print(f"ERROR -> {e}")
