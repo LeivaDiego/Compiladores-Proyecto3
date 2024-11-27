@@ -1144,8 +1144,10 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                                         self.instruction_generator.load(Register(f"PARAM::{symbol.parameters[i].id}", None, None), args[i].value)
 
                                 # Generate the jump call to the function
-                                self.instruction_generator.jump_link(f"{symbol.id.lower()}")
-
+                                if self.current_class:
+                                    self.instruction_generator.jump_link(f"{symbol.id.lower()}_{self.current_class.parent.id.lower() if self.current_class.parent else ''}")
+                                else:
+                                    self.instruction_generator.jump_link(symbol.id.lower())
                                 return symbol.return_type
                 
                 return call_type
@@ -1372,16 +1374,10 @@ class IntermediateCodeGenerator(compiscriptVisitor):
                 if self.current_class is not None:
                     if self.current_class.parent is not None:
                         symbol = self.current_class.parent.search_method(identifier)
-                        if symbol is None:
-                            raise Exception(f"Method {identifier} not found in parent class {self.current_class.parent.id}")
-                        
-                        return symbol.return_type
+                        copy = Function(f"{symbol.id.lower()}_{self.current_class.parent.id.lower()}", 
+                                        symbol.return_type)
+                        return copy
                     
-                    else:
-                        raise Exception(f"Parent class not found for class {self.current_class.id}")
-                
-                else:
-                    raise Exception(f"Super call outside of class")
 
 
 

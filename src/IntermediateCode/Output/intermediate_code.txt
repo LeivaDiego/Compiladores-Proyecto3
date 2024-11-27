@@ -139,7 +139,7 @@ jr $ra    # Return to caller
 init_estudiante:
 load PARAM::nombre, $t1    # Load data into register PARAM::nombre
 load PARAM::edad, $t1    # Load data into register PARAM::edad
-jal init    # Jump and link to init
+jal init_persona    # Jump and link to init_persona
 load $t1, SELF::grado    # Load data into register $t1
 save $t1, $t0    # save data into register
 jr $ra    # Return to caller
