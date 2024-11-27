@@ -9,7 +9,7 @@ from IntermediateCode.ci_generator import IntermediateCodeGenerator
 
 def main():
     # Get the input file and create a file stream
-    input_file = 'src/Input/Examples/Ejemplo4.cspt'
+    input_file = 'src/Input/Examples/Ejemplo1.cspt'
     input_stream = FileStream(input_file)
 
     # Create the lexer and use a custom error listener

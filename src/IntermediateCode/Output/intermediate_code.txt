@@ -1,135 +1,179 @@
 .data
-medio: .word 0
-valorMedio: .word 1
-buscador:     # Class Instance buscador
-objetivo: .word 7
-STR_0: .asciiz "El elemento "
-STR_1: .asciiz " esta en el indice: "
+promedio: .word 0
+nombre: .asciiz "Erick"
+juan:     # Class Instance juan
+    .asciiz "Erick"
+    .word 20
+    .asciiz "rojo"
+    .word 3
+i: .word 1
+resultado: .word 0
+STR_0: .asciiz "rojo"
+STR_1: .asciiz "Hola, mi nombre es "
 BUFFER: .space 200
+STR_2: .asciiz "Ahora tengo "
+STR_3: .asciiz "anios."
+STR_4: .asciiz " esta estudiando en "
+STR_5: .asciiz "grado."
+STR_6: .asciiz "El promedio de "
+STR_7: .asciiz " es "
+STR_8: .asciiz "Erick"
+STR_9: .asciiz " es par"
+STR_10: .asciiz " es impar"
+STR_11: .asciiz "Resultado de la expresion: "
 
 
 .text
 .globl main     # Entry point of the program
 main:
-load SELF, Busqueda    # Load data into register SELF
-jal init_busqueda    # Jump and link to init_busqueda
-load $t0, objetivo    # Load data into register $t0
-load $t0, 7    # Load data into register $t0
-save $t0, $t0    # save data into register
-load SELF, buscador    # Load data into register SELF
-load PARAM::izquierda, 0    # Load data into register PARAM::izquierda
-load PARAM::derecha, 6    # Load data into register PARAM::derecha
-load PARAM::objetivo, $t0    # Load data into register PARAM::objetivo
-jal busquedabinaria_busqueda    # Jump and link to busquedabinaria_busqueda
-load $t0, indice    # Load data into register $t0
-load $t0, None    # Load data into register $t0
-save $t0, $t0    # save data into register
-load $t0, STR_0    # Load data into register $t0
-load $t0, objetivo    # Load data into register $t0
-add $t0, $t0, $t0    # Addition operation
-load $t0, STR_1    # Load data into register $t0
-concat $t0, $t0, $t0    # Concatenation operation
-load $t0, indice    # Load data into register $t0
-add $t0, $t0, $t0    # Addition operation
-load $v0,      # Set mode to print 
+load $t0, nombre    # Load data into register $t0
+load $t1, STR_8    # Load data into register $t1
+save $t0, $t1    # save data into register
+load SELF, juan    # Load data into register SELF
+load PARAM::nombre, $t0    # Load data into register PARAM::nombre
+load PARAM::edad, 20    # Load data into register PARAM::edad
+load PARAM::grado, 3    # Load data into register PARAM::grado
+jal init_estudiante    # Jump and link to init_estudiante
+load SELF, juan    # Load data into register SELF
+jal saludar_estudiante    # Jump and link to saludar_estudiante
+load SELF, juan    # Load data into register SELF
+jal estudiar_estudiante    # Jump and link to estudiar_estudiante
+load SELF, juan    # Load data into register SELF
+load PARAM::anios, 5    # Load data into register PARAM::anios
+jal incrementaredad_estudiante    # Jump and link to incrementaredad_estudiante
+load $t0, i    # Load data into register $t0
+load $t1, 1    # Load data into register $t1
+save $t0, $t1    # save data into register
+L0:
+load $t0, i    # Load data into register $t0
+load $t1, 5    # Load data into register $t1
+slt $t2, $t0, $t1   # Save 1 if $t0 < $t1 else 0
+beq $t2, $zero, L1    # Jump to L1 if equals
+load $t0, i    # Load data into register $t0
+load $t1, 2    # Load data into register $t1
+div $t0, $t1
+mfhi $t3    # Save the remainder (from HI register) into destination
+load $t0, num    # Load data into register $t0
+load $t1, 0    # Load data into register $t1
+beq $t0, $t1, L2    # Jump to L2 if equals
+bne $t0, $t1, L3    # Jump to L3 if not equals
+L2:
+load $t0, i    # Load data into register $t0
+load $t1, STR_9    # Load data into register $t1
+concat $t4, $t0, $t1    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
+j L4    # Jump to L4
+L3:
+load $t4, i    # Load data into register $t4
+load $t0, STR_10    # Load data into register $t0
+concat $t1, $t4, $t0    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
+L4:
+load $t1, i    # Load data into register $t1
+load $t4, 1    # Load data into register $t4
+add $t0, $t1, $t4    # Addition operation
+load $t1, i    # Load data into register $t1
+save $t1, $t0    # save data into register
+j L0    # Jump to L0
+L1:
+load $t1, edad    # Load data into register $t1
+load $t0, 2    # Load data into register $t0
+mult $t4, $t1, $t0    # Multiplication operation
+load $t1, 5    # Load data into register $t1
+load $t0, 3    # Load data into register $t0
+sub $t5, $t1, $t0    # Subtraction operation
+load $t1, 2    # Load data into register $t1
+div $t5, $t1
+mflo $t0    # Save the quotient (from LO register) into destination
+add $t5, $t4, $t0    # Addition operation
+load $t4, resultado    # Load data into register $t4
+save $t4, $t5    # save data into register
+load $t4, STR_11    # Load data into register $t4
+load $t5, resultado    # Load data into register $t5
+concat $t0, $t4, $t5    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
 syscall  # Print the value
 # End of program
 li $v0, 10     # Set mode to exit
 syscall       # Exit the program
 
 
-init_busqueda:
-jr $ra    # Return to caller
-obtenervalorenindice_busqueda:
-L0:
-load $t0, 1    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L1    # Jump to L1
-L1:
-L2:
-load $t0, 3    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L3    # Jump to L3
-L3:
-L4:
-load $t0, 5    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L5    # Jump to L5
-L5:
-L6:
-load $t0, 7    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L7    # Jump to L7
-L7:
-L8:
-load $t0, 9    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L9    # Jump to L9
-L9:
-L10:
-load $t0, 11    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L11    # Jump to L11
-L11:
-L12:
-load $t0, 13    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-j L13    # Jump to L13
-L13:
-load $t0, 1    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
-jr $ra    # Return to caller
-busquedabinaria_busqueda:
-load $t0, derecha    # Load data into register $t0
-load $t0, izquierda    # Load data into register $t0
-beq $t0, $t0, L14    # Jump to L14 if equals
-slt $t0, $t0, $t0   # Save 1 if $t0 < $t0 else 0
-bne $t0, $zero, L14    # Jump to L14 if not equals
-beq $t0, $zero, L15    # Jump to L15 if equals
-L14:
-load $t0, izquierda    # Load data into register $t0
-load $t0, derecha    # Load data into register $t0
-add $t0, $t0, $t0    # Addition operation
-load $t0, 2    # Load data into register $t0
-div $t0, $t0
-mflo $t0    # Save the quotient (from LO register) into destination
-load $s0, medio    # Load data into register $s0
+init_persona:
+load $s0, SELF::nombre    # Load data into register $s0
 save $s0, $t0    # save data into register
-load PARAM::indice, $t0    # Load data into register PARAM::indice
-jal obtenervalorenindice_busqueda    # Jump and link to obtenervalorenindice_busqueda
-load $t0, valorMedio    # Load data into register $t0
-load $t0, 1    # Load data into register $t0
-save $t0, $t0    # save data into register
-load $t0, valorMedio    # Load data into register $t0
-load $t0, objetivo    # Load data into register $t0
-slt $t0, $t0, $t0   # Save 1 if $t0 < $t0 else 0
-bne $t0, $zero, L16    # Jump to L16 if not equals
-beq $t0, $zero, L17    # Jump to L17 if equals
-L16:
-load PARAM::izquierda, $t0    # Load data into register PARAM::izquierda
-jal busquedabinaria_busqueda    # Jump and link to busquedabinaria_busqueda
-load $t0, None    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
+load $t0, SELF::edad    # Load data into register $t0
+load $t1, PARAM::edad    # Load data into register $t1
+save $t0, $t1    # save data into register
+load $t0, SELF::color    # Load data into register $t0
+load $t1, STR_0    # Load data into register $t1
+save $t0, $t1    # save data into register
 jr $ra    # Return to caller
-j L17    # Jump to L17
-L17:
-load $t0, medio    # Load data into register $t0
-load $t0, 1    # Load data into register $t0
-add $t0, $t0, $t0    # Addition operation
-load PARAM::izquierda, num    # Load data into register PARAM::izquierda
-jal busquedabinaria_busqueda    # Jump and link to busquedabinaria_busqueda
-load $t0, None    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
+saludar_persona:
+load $t0, STR_1    # Load data into register $t0
+load $t1, SELF::nombre    # Load data into register $t1
+concat $t2, $t0, $t1    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
 jr $ra    # Return to caller
-j L15    # Jump to L15
-L15:
-load $t0, 1    # Load data into register $t0
-move $v0, $t0    # Move value from $t0 to $v0
+incrementaredad_persona:
+load $t2, SELF::edad    # Load data into register $t2
+load $t0, anios    # Load data into register $t0
+add $t1, $t2, $t0    # Addition operation
+load $t2, SELF::edad    # Load data into register $t2
+save $t2, $t1    # save data into register
+load $t2, STR_2    # Load data into register $t2
+load $t1, SELF::edad    # Load data into register $t1
+concat $t0, $t2, $t1    # Concatenation operation
+load $t2, STR_3    # Load data into register $t2
+concat $t1, $t0, $t2    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
+jr $ra    # Return to caller
+init_estudiante:
+load PARAM::nombre, $t1    # Load data into register PARAM::nombre
+load PARAM::edad, $t1    # Load data into register PARAM::edad
+jal init    # Jump and link to init
+load $t1, SELF::grado    # Load data into register $t1
+save $t1, $t0    # save data into register
+jr $ra    # Return to caller
+estudiar_estudiante:
+load $t1, SELF::nombre    # Load data into register $t1
+load $t0, STR_4    # Load data into register $t0
+concat $t2, $t1, $t0    # Concatenation operation
+load $t1, SELF::grado    # Load data into register $t1
+concat $t0, $t2, $t1    # Concatenation operation
+load $t2, STR_5    # Load data into register $t2
+concat $t1, $t0, $t2    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
+jr $ra    # Return to caller
+promedionotas_estudiante:
+load $t1, nota1    # Load data into register $t1
+load $t0, nota2    # Load data into register $t0
+add $t2, $t1, $t0    # Addition operation
+load $t1, nota3    # Load data into register $t1
+add $t0, $t2, $t1    # Addition operation
+load $t2, 3    # Load data into register $t2
+div $t0, $t2
+mflo $t1    # Save the quotient (from LO register) into destination
+load $t0, promedio    # Load data into register $t0
+save $t0, $t1    # save data into register
+load $t0, STR_6    # Load data into register $t0
+load $t1, SELF::nombre    # Load data into register $t1
+concat $t2, $t0, $t1    # Concatenation operation
+load $t0, STR_7    # Load data into register $t0
+concat $t1, $t2, $t0    # Concatenation operation
+load $t2, promedio    # Load data into register $t2
+concat $t0, $t1, $t2    # Concatenation operation
+load $a0, BUFFER   # Load string buffer to print into $a0
+load $v0, 4     # Set mode to print 4
+syscall  # Print the value
 jr $ra    # Return to caller

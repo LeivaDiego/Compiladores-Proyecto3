@@ -1406,7 +1406,7 @@ class IntermediateCodeGenerator(compiscriptVisitor):
         
         # Load the class instance to a register
         # We use the SELF keyword to identify the instance
-        self.instruction_generator.load(Register("SELF", None, None), class_id)
+        self.instruction_generator.load(Register("SELF", None, None), self.current_variable.id)
         # Check if the instantiation has arguments
         for i in range(0, len(initializer.parameters)):
             # Check if its a variable
